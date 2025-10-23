@@ -1,0 +1,28 @@
+{
+  "playlists": [
+    {
+      "name": "tony_carreira",
+      "url": "https://vsalema.github.io/tvpt4/css/tony_carreira_best_succes.m3u"
+    },
+    {
+      "name": "DEMO – 2",
+      "url": "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8"
+    },
+    {
+      "name": "DEMO – 3",
+      "url": "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_fmp4/master.m3u8"
+    },
+    {
+      "name": "DEMO – 4",
+      "url": "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8"
+    },
+    {
+      "name": "DEMO – 5",
+      "url": "https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8"
+    },
+    {
+      "name": "DEMO – 6",
+      "url": "https://storage.googleapis.com/shaka-demo-assets/angel-one-hls/hls.m3u8"
+    }
+  ]
+}
