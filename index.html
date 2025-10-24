@@ -3,661 +3,443 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Flux média — JSON → Cartes</title>
+  <title>Lecteur IPTV — viewport</title>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <!-- Bootstrap 5 (unique version) -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://vsalema.github.io/tvpt4/css/glass-theme.css?v=1.0.0">
+  <link rel="stylesheet" href="https://vsalema.github.io/tvpt4/css/nav-responsive.css?v=1">
+  <!-- Video.js (unique version) + plugin YouTube -->
+  <link href="https://vjs.zencdn.net/7.21.1/video-js.css" rel="stylesheet" />
+  <script src="https://vjs.zencdn.net/7.21.1/video.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/videojs-youtube@3/dist/Youtube.min.js"></script>
   <style>
-    :root {
-      --bg: #0f1115;
-      --panel: #171a21;
-      --muted: #a7b0c0;
-      --text: #e6e9ef;
-      --accent: #4f8cff;
-      --accent-2: #7c5cff;
-      --radius: 16px;
-      --outline: #202633;
+    :root{ --ch-logo-size:60px; --nb-logo-size:44px; }
+    #channelList img, #channelList2 img, #inlineChannelList img{
+      width:var(--ch-logo-size)!important;height:var(--ch-logo-size)!important;object-fit:contain;flex:0 0 var(--ch-logo-size);aspect-ratio:1/1;margin-right:.5rem;
     }
-    [data-theme="light"] {
-      --bg: #f6f7fb;
-      --panel: #ffffff;
-      --muted: #5b6678;
-      --text: #0f1320;
-      --accent: #2f6bff;
-      --accent-2: #7a4dff;
-      --outline: #e6e9ef;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
-        Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-      background: linear-gradient(120deg, #10131a, #0b0e14 40%, #0f1115);
-      color: var(--text);
-      min-height: 100vh;
-    }
-    [data-theme="light"] body { background: #f6f7fb; }
-
-    header {
-      position: sticky; top: 0; z-index: 10;
-      backdrop-filter: saturate(130%) blur(6px);
-      background: rgba(15, 17, 21, 0.7);
-      border-bottom: 1px solid var(--outline);
-    }
-    [data-theme="light"] header { background: rgba(255,255,255,0.8); }
-
-    .wrap { max-width: 1200px; margin: 0 auto; padding: 20px; }
-    h1 { margin: 6px 0 2px; font-size: 22px; font-weight: 650; }
-    .sub { color: var(--muted); font-size: 13px; }
-
-    .toolbar { display: grid; grid-template-columns: 1fr auto auto auto auto; gap: 12px; margin-top: 14px; align-items: center; }
-    input[type="search"], select {
-      width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid #222836;
-      background: #0d1016; color: var(--text);
-      outline: none; box-shadow: inset 0 0 0 1px #141a26; appearance: none;
-    }
-    [data-theme="light"] input[type="search"], [data-theme="light"] select { background: #fff; border-color: var(--outline); box-shadow: none; }
-    select { width: auto; }
-    .btn {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 10px 14px; border-radius: 12px; border: 1px solid #2a3347;
-      background: linear-gradient(180deg, #1a2030, #121827);
-      color: var(--text); text-decoration: none; font-weight: 600; font-size: 14px;
-      cursor: pointer;
-    }
-    [data-theme="light"] .btn { background: #fff; border-color: var(--outline); }
-    .btn:focus, .btn:hover { border-color: #3b4660; }
-    .btn-primary { border-color: transparent; background: linear-gradient(180deg, var(--accent), var(--accent-2)); color: white; }
-
-    .seg {
-      display: inline-flex; border: 1px solid var(--outline); border-radius: 12px; overflow: hidden;
-    }
-    .seg button { background: transparent; border: 0; padding: 10px 12px; color: var(--text); cursor: pointer; }
-    .seg button[aria-pressed="true"] { background: var(--panel); box-shadow: inset 0 0 0 999px rgba(127,127,127,0.08); }
-
-    .filters { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
-    .chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--outline); padding: 6px 10px; border-radius: 999px; font-size: 12px; cursor: pointer; }
-    .chip.active { background: rgba(127,127,255,0.12); border-color: var(--accent); }
-    .chip .x { font-weight: 700; opacity: 0.7; }
-
-    main { padding: 22px 0 36px; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
-    body.list .grid { grid-template-columns: 1fr; }
-
-    .card { background: var(--panel); border: 1px solid var(--outline); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; min-height: 280px; box-shadow: 0 2px 0 rgba(0,0,0,0.2), 0 12px 24px rgba(0,0,0,0.18); }
-    body.list .card { flex-direction: row; min-height: unset; }
-    .thumb { width: 100%; aspect-ratio: 16/9; background: #0b0e14; object-fit: cover; }
-    body.list .thumb { width: 320px; min-width: 240px; height: 180px; aspect-ratio: auto; }
-
-    .content { padding: 14px; display: grid; gap: 10px; }
-    .title { font-size: 16px; line-height: 1.3; font-weight: 700; }
-    .desc { color: var(--muted); font-size: 13px; line-height: 1.5; max-height: 6.9em; overflow: hidden; }
-    .meta { display: flex; gap: 8px; flex-wrap: wrap; }
-    .pill { border: 1px solid var(--outline); padding: 4px 8px; font-size: 12px; border-radius: 999px; color: #c2c9d6; }
-    [data-theme="light"] .pill { color: #3b4251; }
-    .actions { display: flex; gap: 8px; margin-top: auto; padding: 0 14px 14px; }
-
-    .status { margin-top: 12px; font-size: 13px; color: var(--muted); display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
-    .status code { user-select: all; }
-    .error { color: #ffb4b4; }
-
-    .pager { display: flex; gap: 8px; justify-content: center; margin-top: 20px; }
-    .pager button { border: 1px solid var(--outline); background: transparent; color: var(--text); border-radius: 10px; padding: 8px 12px; cursor: pointer; }
-    .pager button[disabled] { opacity: 0.5; cursor: not-allowed; }
-
-    /* Skeletons */
-    .skel { animation: pulse 1.2s ease-in-out infinite; background: linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.12), rgba(255,255,255,0.06)); }
-    @keyframes pulse { 0%{background-position:0% 0%} 100%{background-position:200% 0%} }
-    .card.skel .thumb { background: #131722; }
-    .card.skel .content > * { height: 14px; background: #131722; border-radius: 6px; }
-
-    /* Modal */
-    .modal { position: fixed; inset: 0; display: none; z-index: 9999; }
-    .modal.show { display: block; }
-    .modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.55); backdrop-filter: blur(2px); }
-    .modal-dialog { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(920px, 92vw); height: min(70vh, 85vh); background: var(--panel); border: 1px solid #22293a; border-radius: 18px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
-    .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--outline); }
-    .modal-title { font-weight: 700; }
-    .modal-close { appearance: none; border: 0; background: transparent; color: var(--text); font-size: 22px; cursor: pointer; padding: 6px 10px; }
-    .modal-body { flex: 1; background: #0b0e14; display: grid; place-items: center; }
-    .modal-body iframe, .modal-body video { width: 100%; height: 100%; border: 0; }
-
-    footer { padding: 28px 20px; color: #9aa3b2; border-top: 1px solid var(--outline); }
-    code { background: #0d1117; border: 1px solid #1f2633; padding: 2px 6px; border-radius: 8px; }
-      .modal-actions{display:flex;align-items:center;gap:6px}
-    /* Logo responsive */
-    .brand { margin: 6px 0 2px; }
-    .brand .logo { display: block; max-width: 100%; height: auto; }
-</style>
-  <!-- Hints réseau pour accélérer TMDB -->
-  <link rel="preconnect" href="https://image.tmdb.org" crossorigin>
-  <link rel="dns-prefetch" href="//image.tmdb.org">
+    #nowbar img.logo{ width:var(--nb-logo-size)!important; height:var(--nb-logo-size)!important; object-fit:contain; }
+  </style>
 </head>
 <body>
-  <header>
-    <div class="wrap">
-      <div class="brand">
-        <a href="#" aria-label="Accueil">
-          <img class="logo" src="https://raw.githubusercontent.com/imagesloads/images/refs/heads/main/img_2ee63541049ea6b3.png" alt="Logo" width="135" height="30" decoding="async" />
-        </a>
-      </div>
-      <div class="sub">Cette page suppose que le fichier JSON est accessible à la <strong>même origine</strong>. Vous pouvez aussi passer un paramètre <code>?src=URL</code> pour charger un autre JSON.</div>
-      <div class="toolbar">
-        <input id="q" type="search" placeholder="Filtrer par titre ou description…" autocomplete="off" />
-        <select id="sort">
-          <option value="relevance">Trier : pertinence</option>
-          <option value="title_asc">Titre A→Z</option>
-          <option value="title_desc">Titre Z→A</option>
-          <option value="date_desc">Date · récent → ancien</option>
-          <option value="date_asc">Date · ancien → récent</option>
-        </select>
-        <div class="seg" role="group" aria-label="Affichage">
-          <button id="viewGrid" aria-pressed="true" title="Grille">Grille</button>
-          <button id="viewList" aria-pressed="false" title="Liste">Liste</button>
-        </div>
-        <button class="btn" id="reload" type="button">Recharger</button>
-        <button class="btn" id="theme" type="button" title="Basculer thème">Thème</button>
-      </div>
-      <div class="filters" id="filters"></div>
-      <div class="status" id="status" aria-live="polite"></div>
-    </div>
-  </header>
+  <!-- Top bar -->
+  <nav class="navbar navbar-dark glass">
+    <div class="container-fluid gap-2">
+      <a class="brand navbar-brand d-flex align-items-center gap-2 me-2 nav-left" href="#">
+        <img src="https://vsalema.github.io/tvpt4/css/logogreen.png" alt="Logo" class="brand-logo" width="26" height="26" decoding="async" draggable="false"/>
+        Lecteur IPTV
+      </a>
 
-  <main class="wrap">
-    <div class="grid" id="grid" role="list"></div>
-    <div class="pager" id="pager"></div>
+      <!-- FORMULAIRE DANS LA TOPBAR -->
+      <form class="d-flex align-items-center gap-2 nav-center"
+        role="search"
+        onsubmit="event.preventDefault();
+          const v = document.getElementById('inputUrl').value.trim();
+          if (!v) return;
+          if (/\.json(\?|#|$)/i.test(v)) { window.IPTV_JSON?.load?.(v); }
+          else { window.loadSource?.(v); }">
+        <label for="inputUrl" class="visually-hidden">Lire une URL</label>
+        <input id="inputUrl" type="url" inputmode="url" class="form-control form-control-sm topbar-url" placeholder="URL (.m3u8/.mp4/.mp3/.mpd/YouTube)" />
+        <button id="btnPlay" type="button" class="btn btn-accent btn-sm">Lire</button>
+        <label for="inputFile" class="btn btn-outline-light btn-sm mb-0">Fichier…</label>
+        <input id="inputFile" class="form-control d-none" type="file" accept="video/*,audio/*" />
+      </form>
+
+      <div class="d-flex gap-2 align-items-center nav-right">
+        <button id="btnRefresh" type="button" class="btn btn-accent btn-sm btn-refresh" title="Rafraîchir la page" aria-label="Rafraîchir la page">
+          <svg class="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.65 6.35a8 8 0 1 0 2.3 7.11 1 1 0 0 0-1.96-.39 6 6 0 1 1-1.73-5.33l-1.79 1.79a1 1 0 0 0 .7 1.7H22a1 1 0 0 0 1-1V2.99a1 1 0 0 0-1.7-.7l-1.65 1.65a9.96 9.96 0 0 0-2 2.41Z"/></svg>
+        </button>
+
+        <!-- 🔸 Boutons rapides -->
+        <button id="btnQuickFav" type="button" class="btn btn-outline-light btn-sm" title="Ouvrir le panneau sur Favoris">
+          <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+        </button>
+
+        <button id="btnQuickHist" type="button" class="btn btn-outline-light btn-sm" title="Ouvrir le panneau sur Historique">
+          <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true"><path d="M13 3a9 9 0 1 0 9 9h-2a7 7 0 1 1-2.05-4.95L15 7v6h6l-.02-2h-4V5.5A8.98 8.98 0 0 0 13 3z"/></svg>
+        </button>
+
+        <button class="btn btn-outline-light btn-sm" data-bs-toggle="offcanvas" data-bs-target="#panel" aria-controls="panel">
+          Playlist &amp; Chaînes
+        </button>
+        <div class="dropdown">
+          <button id="btnAppearance" class="btn btn-outline-light btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+            <svg class="icon me-1" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20V2z"/></svg>
+          </button>
+          <div class="dropdown-menu dropdown-menu-end p-2" style="min-width:220px">
+            <div class="form-check mb-1"><input class="form-check-input" type="radio" name="themeRadios" id="thAuto" value="auto"><label class="form-check-label" for="thAuto">Auto (système)</label></div>
+            <div class="form-check mb-1"><input class="form-check-input" type="radio" name="themeRadios" id="thLight" value="light"><label class="form-check-label" for="thLight">Clair</label></div>
+            <div class="form-check mb-2"><input class="form-check-input" type="radio" name="themeRadios" id="thDark" value="dark"><label class="form-check-label" for="thDark">Sombre</label></div>
+            <hr class="my-2">
+            <div class="form-check"><input class="form-check-input" type="checkbox" id="hcToggle"><label class="form-check-label" for="hcToggle">Contraste élevé</label></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main content -->
+  <main class="container py-3 py-md-4">
+    <div class="row g-4">
+      <div class="col-12">
+        <div class="player-wrap">
+          <!-- VideoJS player -->
+          <video id="player" class="video-js vjs-big-play-centered vjs-fill" controls preload="auto" autoplay loop poster="https://raw.githubusercontent.com/imagesloads/images/refs/heads/main/img_4b6157ae02c87afb.gif" muted playsinline></video>
+
+          <!-- ✨ NOWBAR -->
+          <div id="nowbar" class="nowbar d-none" aria-live="polite">
+            <img id="channelLogo" class="logo d-none" alt="Logo chaîne" />
+            <div class="meta">
+              <h5 id="nowPlaying" class="np-title">Aucune chaîne en cours</h5>
+              <div id="nowUrl" class="np-url text-truncate"></div>
+            </div>
+          </div>
+
+          <!-- 🔎 Mini player dock (aperçu) -->
+          <div id="miniDock" class="mini-dock d-none" aria-hidden="true">
+            <video id="miniPlayer" class="video-js vjs-fill" muted playsinline preload="auto"></video>
+          </div>
+        </div>
+
+        <!-- 🔁 ZAPBAR -->
+        <div id="zapbar" class="zapbar glass" aria-live="polite">
+          <button id="btnFsPage" type="button" class="btn btn-outline-light btn-sm" title="Plein écran — page" aria-pressed="false">
+            <svg class="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 14H5v5h5v-2H7v-3Zm0-4h2V7h3V5H7v5Zm10 7h-3v2h5v-5h-2v3Zm2-12h-5v2h3v3h2V5Z"/></svg>
+            <span class="d-none d-sm-inline">Page</span>
+          </button>
+
+          <button id="btnPrev" type="button" class="btn btn-outline-light btn-sm" title="Chaîne précédente" aria-label="Chaîne précédente">
+            <svg class="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+            <span class="d-none d-sm-inline">Précédent</span>
+          </button>
+          <div id="zapTitle" class="zap-title text-truncate">—</div>
+          <button id="btnNext" type="button" class="btn btn-accent btn-sm" title="Chaîne suivante" aria-label="Chaîne suivante">
+            <span class="d-none d-sm-inline">Suivant</span>
+            <svg class="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m10 6 1.41 1.41L8.83 10H18v2H8.83l2.58 2.59L10 16l-6-6z"/></svg>
+          </button>
+
+          <button id="btnFsPlayer" type="button" class="btn btn-outline-light btn-sm" title="Plein écran — player" aria-pressed="false">
+            <svg class="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 14H5v5h5v-2H7v-3Zm0-4h2V7h3V5H7v5Zm10 7h-3v2h5v-5h-2v3Zm2-12h-5v2h3v3h2V5Z"/></svg>
+            <span class="d-none d-sm-inline">Player</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Right column (masquée ici) -->
+      <div class="d-none">
+        <aside class="card glass aside-tight">
+          <div class="card-body">
+            <div class="mb-3">
+              <label for="sourceSelect" class="form-label d-flex align-items-center justify-content-between">
+                <span>Source M3U</span>
+                <button id="plFavBtn1" type="button" class="btn btn-sm btn-star" title="Ajouter aux favoris" aria-pressed="false" aria-label="Favori">
+                  <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+                </button>
+              </label>
+              <select id="sourceSelect" class="form-select">
+                <option value="https://vsalema.github.io/streamboxv.3/playlists.json">JSON</option>
+                <option value="https://raw.githubusercontent.com/vsalema/tvpt4/refs/heads/main/css/TVradioZap-TV-Europe%2B_s_2024-12-27.m3u">France TV 🇫🇷</option>
+                <option value="https://raw.githubusercontent.com/vsalema/tvpt4/refs/heads/main/js/M3UPT.m3u">Portugal – plages 🇵🇹</option>
+                <option value="https://raw.githubusercontent.com/vsalema/tvpt4/refs/heads/main/css/PT.m3u">Portugal TV 🇵🇹</option>
+                <option value="https://raw.githubusercontent.com/vsalema/tvpt4/refs/heads/main/css/movies.m3u">Films 🎬</option>
+                <option value="https://raw.githubusercontent.com/Paradise-91/ParaTV/refs/heads/main/playlists/samsungtvplus/group/fr/fr.m3u">Samsung TV Plus FR</option>
+                <option value="https://iptv-org.github.io/iptv/index.m3u">IPTV Monde</option>
+                <option value="custom">(Coller un lien personnalisé…)</option>
+              </select>
+            </div>
+            <div class="mb-3 d-none" id="customUrlWrap">
+              <label for="customUrl" class="form-label">Lien M3U personnalisé</label>
+              <input id="customUrl" class="form-control" placeholder="https://…/playlist.m3u" />
+            </div>
+            <div class="d-grid gap-2">
+              <button id="btnLoadM3U" class="btn btn-outline-light">Charger la playlist</button>
+              <input id="m3uFile" class="form-control" type="file" accept=".m3u,.m3u8" />
+            </div>
+            <hr />
+            <div class="d-grid gap-2 mt-2">
+              <button id="btnCheckLinks" class="btn btn-accent w-50 mx-auto">Vérifier les liens</button>
+              <div id="checkProgress" class="progress d-none" style="height:10px;">
+                <div class="progress-bar" role="progressbar" style="width:0%"></div>
+              </div>
+              <div id="checkSummary" class="tiny"></div>
+            </div>
+            <div class="mb-3">
+              <label for="categorySelect" class="form-label">Catégorie</label>
+              <select id="categorySelect" class="form-select"></select>
+            </div>
+            <div>
+              <label class="form-label d-flex align-items-center justify-content-between">
+                <span>Chaînes</span>
+                <input id="search" class="form-control form-control-sm ms-3" style="max-width: 180px" placeholder="Rechercher…" />
+              </label>
+              <div id="channelList" class="list-group" style="max-height: 45vh; overflow-y:auto;"></div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <!-- ===== Inline Panel à droite du player ===== -->
+    <aside id="inlinePanel" class="inline-panel glass aside-tight d-none" aria-hidden="true">
+      <div class="p-2 d-flex align-items-center justify-content-between">
+        <strong class="small">Playlist &amp; Chaînes</strong>
+        <button id="inlineClose" type="button" class="btn btn-outline-light btn-sm" title="Fermer">Fermer</button>
+      </div>
+      <div class="px-2 pb-2">
+        <div class="mb-2">
+          <label class="form-label mb-1">Catégorie</label>
+          <select id="inlineCategorySelect" class="form-select form-select-sm"></select>
+        </div>
+        <div class="mb-2">
+          <input id="inlineSearch" class="form-control form-control-sm" placeholder="Rechercher…" />
+        </div>
+        <div id="inlineChannelList" class="list-group" style="max-height:60vh; overflow-y:auto;"></div>
+      </div>
+    </aside>
   </main>
 
-  <!-- Modal lecteur -->
-  <div id="modal" class="modal" aria-hidden="true">
-    <div class="modal-backdrop" data-close></div>
-    <div class="modal-dialog" role="dialog" aria-modal="true" aria-label="Lecteur">
-      <div class="modal-header">
-        <div class="modal-title">Lecteur</div>
-        <div class="modal-actions">
-        <button id="modalFs" class="modal-close" type="button" aria-label="Plein écran">⛶</button>
-        <button id="modalClose" class="modal-close" type="button" aria-label="Fermer">×</button>
+  <!-- Offcanvas panel (mobile / tablet) -->
+  <div class="offcanvas offcanvas-start glass aside-tight" tabindex="-1" id="panel" aria-labelledby="panelLabel">
+    <div class="offcanvas-header align-items-center gap-2">
+      <h5 id="panelLabel" class="offcanvas-title visually-hidden">Playlist &amp; Chaînes</h5>
+
+      <div class="btn-group btn-group-sm" role="group" aria-label="Listes rapides">
+        <button id="btnListFav" type="button" class="btn btn-outline-light btn-tab" data-listmode="favorites" title="Voir mes chaînes favorites">
+          <svg class="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" width="16" height="16"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+          <span class="d-none d-sm-inline ms-1">Favoris</span>
+        </button>
+        <button id="btnListHist" type="button" class="btn btn-outline-light btn-tab" data-listmode="history" title="Voir l’historique de lecture">
+          <svg class="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" width="16" height="16"><path d="M13 3a9 9 0 1 0 9 9h-2a7 7 0 1 1-2.05-4.95L15 7v6h6l-.02-2h-4V5.5A8.98 8.98 0 0 0 13 3z"/></svg>
+          <span class="d-none d-sm-inline ms-1">Historique</span>
+        </button>
+        <button id="btnExportData" type="button" class="btn btn-outline-light btn-sm" title="Exporter favoris & historique">
+          <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true"><path d="M5 20h14v-2H5v2Zm7-16-5 5h3v6h4V9h3l-5-5Z"/></svg>
+          <span class="d-none d-sm-inline ms-1">Exporter</span>
+        </button>
+
+        <button id="btnImportData" type="button" class="btn btn-outline-light btn-sm" title="Importer depuis un fichier JSON">
+          <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true"><path d="M5 20h14v-2H5v2Zm7-16 5 5h-3v6h-4V9H7l5-5Z"/></svg>
+          <span class="d-none d-sm-inline ms-1">Importer</span>
+        </button>
+        <input id="importFile" type="file" accept="application/json" class="d-none" />
       </div>
+
+      <button id="btnClearHist" type="button" class="btn btn-outline-light btn-sm d-none" title="Effacer tout l’historique">
+        <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true"><path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12Zm3.46-9h1.5v8h-1.5v-8Zm4 0h1.5v8h-1.5v-8ZM15.5 4 14 2h-4L8.5 4H4v2h16V4h-4.5Z"/></svg>
+      </button>
+      <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="offcanvas" aria-label="Fermer"></button>
+    </div>
+
+    <div class="offcanvas-body">
+      <div class="mb-3">
+        <label for="sourceSelect2" class="form-label d-flex align-items-center justify-content-between">
+          <span>Source M3U</span>
+          <button id="plFavBtn2" type="button" class="btn btn-sm btn-star" title="Ajouter aux favoris" aria-pressed="false" aria-label="Favori">
+            <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+          </button>
+        </label>
+        <select id="sourceSelect2" class="form-select">
+          <option value="https://raw.githubusercontent.com/vsalema/tvpt4/refs/heads/main/css/TVradioZap-TV-Europe%2B_s_2024-12-27.m3u">France TV 🇫🇷</option>
+          <option value="https://raw.githubusercontent.com/vsalema/tvpt4/refs/heads/main/js/M3UPT.m3u">Portugal – plages 🇵🇹</option>
+          <option value="https://raw.githubusercontent.com/vsalema/tvpt4/refs/heads/main/css/PT.m3u">Portugal TV 🇵🇹</option>
+          <option value="https://raw.githubusercontent.com/vsalema/tvpt4/refs/heads/main/css/movies.m3u">Films 🎬</option>
+          <option value="https://raw.githubusercontent.com/Paradise-91/ParaTV/refs/heads/main/playlists/samsungtvplus/group/fr/fr.m3u">Samsung TV Plus FR</option>
+          <option value="https://iptv-org.github.io/iptv/index.m3u">IPTV Monde</option>
+          <option value="custom">(Coller un lien personnalisé…)</option>
+        </select>
       </div>
-      <div id="modalBody" class="modal-body"></div>
+      <div class="mb-3 d-none" id="customUrlWrap2">
+        <label for="customUrl2" class="form-label">Lien M3U personnalisé</label>
+        <input id="customUrl2" class="form-control" placeholder="https://…/playlist.m3u" />
+      </div>
+      <div class="d-grid gap-2 mb-3">
+        <button id="btnLoadM3U2" class="btn btn-outline-light">Charger la playlist</button>
+        <input id="m3uFile2" class="form-control" type="file" accept=".m3u,.m3u8" />
+      </div>
+
+      <div class="d-grid gap-2 mb-3">
+        <button id="btnCheckLinks2" class="btn btn-accent w-50 mx-auto">Vérifier les liens</button>
+        <div id="checkProgress2" class="progress d-none" style="height:10px;"><div class="progress-bar" role="progressbar" style="width:0%"></div></div>
+        <div id="checkSummary2" class="tiny"></div>
+      </div>
+
+      <div class="mb-3">
+        <label for="categorySelect2" class="form-label">Catégorie</label>
+        <select id="categorySelect2" class="form-select"></select>
+      </div>
+      <div>
+        <label class="form-label d-flex align-items-center justify-content-between">
+          <span>Chaînes</span>
+          <input id="search2" class="form-control form-control-sm ms-3" style="max-width: 180px" placeholder="Rechercher…" />
+        </label>
+        <div id="channelList2" class="list-group" style="max-height: 50vh; overflow-y:auto;"></div>
+      </div>
     </div>
   </div>
 
-  <footer class="wrap">
-    <div>
-      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px;">
-        <input id="file" type="file" accept="application/json" />
-        <button class="btn" id="exportJson" type="button">Exporter (JSON) — éléments visibles</button>
-        <button class="btn" id="exportCsv" type="button">Exporter (CSV) — éléments visibles</button>
-        <a id="openSrc" class="btn" href="#" target="_blank" rel="noopener">Ouvrir la source</a>
-      </div>
-      <div>Astuce : si vous ouvrez ce fichier directement en <code>file://</code>, certains navigateurs bloquent <code>fetch()</code>. Servez ces fichiers via un petit serveur HTTP local (ex. <code>python -m http.server</code>) ou placez-les sur votre hébergement.</div>
-    </div>
-  </footer>
+  <!-- Menu contextuel -->
+  <div id="ctxMenu" class="ctx-menu glass d-none" role="menu" aria-hidden="true">
+    <button type="button" data-act="play">Lire</button>
+    <button type="button" data-act="fav">Ajouter aux favoris</button>
+    <button type="button" data-act="copy">Copier l’URL</button>
+    <button type="button" data-act="open">Ouvrir dans un nouvel onglet</button>
+  </div>
 
+  <!-- Tes scripts -->
+  <script src="./scriptiptv.js" defer></script>
+  <script src="./json-playlist.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- Appel d'init fourni par toi -->
   <script>
-    // ====== Config / URL params ======
-    const DEFAULT_JSON_URL = './getFeed.php.json';
-    const usp = new URLSearchParams(location.search);
-    const JSON_URL = usp.get('src') || DEFAULT_JSON_URL; // peut être data: ou http(s): si CORS OK
-
-    // ====== Elements ======
-    const $grid = document.getElementById('grid');
-    const $q = document.getElementById('q');
-    const $sort = document.getElementById('sort');
-    const $status = document.getElementById('status');
-    const $reload = document.getElementById('reload');
-    const $filters = document.getElementById('filters');
-    const $pager = document.getElementById('pager');
-    const $themeBtn = document.getElementById('theme');
-    const $file = document.getElementById('file');
-    const $openSrc = document.getElementById('openSrc');
-
-    const $viewGrid = document.getElementById('viewGrid');
-    const $viewList = document.getElementById('viewList');
-
-    const $modal = document.getElementById('modal');
-    const $modalBody = document.getElementById('modalBody');
-    const $modalClose = document.getElementById('modalClose');
-    const $modalFs = document.getElementById('modalFs');
-
-    // ====== State ======
-    let rawItems = [];
-    let filtered = [];
-    let selectedCats = new Set();
-    let currentSort = usp.get('sort') || 'relevance';
-    let currentPage = parseInt(usp.get('page') || '1', 10);
-    let viewMode = usp.get('view') || 'grid';
-    const PAGE_SIZE = 24;
-    const locale = navigator.language || 'fr-FR';
-
-    // ====== TMDB helpers (images plus rapides) ======
-    const TMDB_BASE = 'https://image.tmdb.org/t/p/';
-    const TMDB_SIZES = '(min-width: 1200px) 300px, (min-width: 768px) 33vw, 100vw';
-    function tmdbPosterSrcset(path){
-      return [
-        `${TMDB_BASE}w342${path} 342w`,
-        `${TMDB_BASE}w500${path} 500w`,
-        `${TMDB_BASE}w780${path} 780w`,
-        `${TMDB_BASE}original${path} 2000w`
-      ].join(', ');
-    }
-    function tmdbExtractPath(url){
-      try{
-        // ex: https://image.tmdb.org/t/p/w500/abcd.jpg -> capture '/abcd.jpg'
-        const m = url.match(/image\.tmdb\.org\/t\/p\/[^/]+(\/[^?]+)/);
-        return m ? m[1] : null;
-      }catch{return null}
-    }
-
-    // ====== Utils ======
-    function setBodyTheme(theme) {
-      document.documentElement.setAttribute('data-theme', theme);
-    }
-    function getCurrentTheme() {
-      return document.documentElement.getAttribute('data-theme') || 'dark';
-    }
-
-    function text(t) { return document.createTextNode(t ?? ''); }
-
-    function el(tag, opts = {}) {
-      const n = document.createElement(tag);
-      if (opts.class) n.className = opts.class;
-      if (opts.attrs) for (const [k,v] of Object.entries(opts.attrs)) {
-        if (v != null) n.setAttribute(k, v);
-      }
-      if (opts.text) n.appendChild(text(opts.text));
-      if (opts.html != null) n.innerHTML = opts.html; // controlled markup only
-      return n;
-    }
-
-    function byPath(obj, path) {
-      return path.split('.').reduce((acc, key) => (acc && acc[key] !== undefined) ? acc[key] : undefined, obj);
-    }
-    function getArray(x) { return Array.isArray(x) ? x : (x ? [x] : []); }
-    function uniq(arr) { return [...new Set(arr)]; }
-
-    function parseDate(str) { if (!str) return null; const d = new Date(str); return isNaN(+d) ? null : d; }
-    function tryFirstDate(it) {
-      return (
-        parseDate(it?.pubDate) ||
-        parseDate(it?.date) ||
-        parseDate(it?.updated) ||
-        parseDate(it?.published) ||
-        parseDate(it?.['dc:date']) ||
-        parseDate(it?.isoDate) ||
-        null
-      );
-    }
-
-    function pickDesc(it, media) {
-      return (
-        media?.['media:description'] ||
-        it?.description ||
-        it?.['content:encoded'] ||
-        ''
-      );
-    }
-
-    function parseItems(data) {
-      const rss = getArray(data?.rss);
-      const channel = getArray(rss?.[0]?.channel);
-      const items = getArray(channel?.[0]?.item);
-      const mapped = items.map((it) => {
-        const title = it?.title ?? '';
-        const link = it?.link ?? '';
-        const media = getArray(it['media:content'])?.[0] ?? {};
-        const thumb = media?.['media:thumbnail']?._url || media?.thumbnail || '';
-        const desc = pickDesc(it, media);
-        const player = media?.['media:player']?._url ?? '';
-        const mediaUrl = media?._url || it?.enclosure?._url || '';
-        const cats = getArray(media?.['media:category']).map(c => c?.['media:category']).filter(Boolean);
-        const dateObj = tryFirstDate(it);
-        const dateMs = dateObj ? dateObj.getTime() : null;
-        return { title, link, thumb, desc, player, mediaUrl, cats, dateMs };
-      });
-      // Déduplication simple
-      const seen = new Set();
-      const out = [];
-      for (const m of mapped) {
-        const key = (m.link || m.mediaUrl || m.title || '').trim();
-        if (!key || seen.has(key)) continue;
-        seen.add(key); out.push(m);
-      }
-      return out;
-    }
-
-    function isVideoUrl(url) {
-      if (!url) return false; const u = url.split('?')[0].toLowerCase();
-      return u.endsWith('.mp4') || u.endsWith('.webm') || u.endsWith('.ogg') || u.endsWith('.m3u8');
-    }
-    function formatDateMs(ms) {
-      if (!ms) return ''; try { return new Date(ms).toLocaleDateString(locale, { year: 'numeric', month: 'short', day: '2-digit' }); } catch { return ''; }
-    }
-
-    function openPlayer(item) {
-      $modalBody.innerHTML = '';
-      let node = null;
-      if (item.player) {
-        node = el('iframe', { attrs: { src: item.player, allow: 'autoplay; encrypted-media; picture-in-picture', allowfullscreen: 'true' } });
-      } else if (isVideoUrl(item.mediaUrl)) {
-        node = el('video', { attrs: { src: item.mediaUrl, controls: 'true', playsinline: 'true' } });
-      }
-      if (!node) {
-        window.open(item.link || item.mediaUrl || item.player, '_blank', 'noopener');
-        return;
-      }
-      $modalBody.appendChild(node);
-      openModal();
-    }
-
-    function openModal() { $modal.classList.add('show'); $modal.setAttribute('aria-hidden', 'false'); }
-    function closeModal() { $modal.classList.remove('show'); $modal.setAttribute('aria-hidden', 'true'); $modalBody.innerHTML = ''; }
-
-    function placeholderThumbSVG() {
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450"><rect width="800" height="450" fill="#10131a"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#4c5670" font-family="sans-serif" font-size="28">Aperçu indisponible</text></svg>`;
-      return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-    }
-
-    function card(item, idx) {
-      const c = el('article', { class: 'card', attrs: { role: 'listitem' } });
-      const imgSrc = item.thumb || placeholderThumbSVG();
-      const imgAttrs = { class: 'thumb', attrs: { alt: '', loading: 'lazy', decoding: 'async' } };
-      let imgSrc = item.thumb || placeholderThumbSVG();
-      const tmdbPath = (typeof imgSrc === 'string' && imgSrc.includes('image.tmdb.org/t/p/')) ? tmdbExtractPath(imgSrc) : null;
-      if (tmdbPath) {
-        imgAttrs.attrs.src = `${TMDB_BASE}w342${tmdbPath}`;
-        imgAttrs.attrs.srcset = tmdbPosterSrcset(tmdbPath);
-        imgAttrs.attrs.sizes = TMDB_SIZES;
-      } else {
-        imgAttrs.attrs.src = imgSrc;
-      }
-      const img = el('img', imgAttrs);
-      // Prioriser les toutes premières vignettes visibles
-      if (typeof idx === 'number' && idx < 2) {
-        img.setAttribute('loading', 'eager');
-        img.setAttribute('fetchpriority', 'high');
-      }
-      c.appendChild(img);
-
-      const content = el('div', { class: 'content' });
-      const h3 = el('div', { class: 'title' }); h3.textContent = item.title || 'Sans titre';
-      const desc = el('p', { class: 'desc' }); desc.textContent = item.desc || '';
-      const meta = el('div', { class: 'meta' });
-      if (item.dateMs) meta.appendChild(el('span', { class: 'pill', text: formatDateMs(item.dateMs) }));
-      for (const cat of item.cats || []) meta.appendChild(el('span', { class: 'pill', text: cat }));
-
-      content.appendChild(h3);
-      if (item.desc) content.appendChild(desc);
-      if ((item.cats && item.cats.length) || item.dateMs) content.appendChild(meta);
-      c.appendChild(content);
-
-      const actions = el('div', { class: 'actions' });
-      if (item.player || isVideoUrl(item.mediaUrl)) {
-        const btnPlay = el('button', { class: 'btn btn-primary', text: 'Lire ici', attrs: { type: 'button' } });
-        btnPlay.addEventListener('click', () => openPlayer(item));
-        actions.appendChild(btnPlay);
-      }
-      if (item.player) actions.appendChild(el('a', { class: 'btn', attrs: { href: item.player, target: '_blank', rel: 'noopener' }, text: 'Ouvrir le lecteur' }));
-      if (item.link) actions.appendChild(el('a', { class: 'btn', attrs: { href: item.link, target: '_blank', rel: 'noopener' }, text: 'Lien' }));
-      if (item.mediaUrl) actions.appendChild(el('a', { class: 'btn', attrs: { href: item.mediaUrl, target: '_blank', rel: 'noopener' }, text: 'Média' }));
-      c.appendChild(actions);
-
-      return c;
-    }
-
-    function skeletonCard() {
-      const c = el('article', { class: 'card skel', attrs: { 'aria-hidden': 'true' } });
-      const t = el('div', { class: 'thumb' }); c.appendChild(t);
-      const content = el('div', { class: 'content' });
-      content.appendChild(el('div'));
-      content.appendChild(el('div'));
-      content.appendChild(el('div'));
-      c.appendChild(content); return c;
-    }
-
-    function render(list, page = 1) {
-      const total = list.length;
-      const start = (page - 1) * PAGE_SIZE;
-      const end = Math.min(start + PAGE_SIZE, total);
-      const slice = list.slice(start, end);
-
-      $grid.innerHTML = '';
-      const frag = document.createDocumentFragment();
-      for (let i = 0; i < slice.length; i++) frag.appendChild(card(slice[i], start + i));
-      $grid.appendChild(frag);
-
-      $status.innerHTML = `${total} élément(s) · Page ${page}/${Math.max(1, Math.ceil(total / PAGE_SIZE))} · Source : <code>${JSON_URL}</code>`;
-      buildPager(total, page);
-
-      // Update URL params
-      const params = new URLSearchParams();
-      if (JSON_URL && JSON_URL !== DEFAULT_JSON_URL) params.set('src', JSON_URL);
-      const qv = ($q.value || '').trim(); if (qv) params.set('q', qv);
-      if (currentSort !== 'relevance') params.set('sort', currentSort);
-      if (viewMode !== 'grid') params.set('view', viewMode);
-      if (selectedCats.size) params.set('cat', [...selectedCats].join(','));
-      if (page > 1) params.set('page', String(page));
-      history.replaceState({}, '', `${location.pathname}?${params.toString()}`);
-    }
-
-    function buildPager(total, page) {
-      $pager.innerHTML = '';
-      const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-      const prev = el('button', { text: '‹ Précédent' }); prev.disabled = page <= 1; prev.addEventListener('click', () => goPage(page - 1));
-      const next = el('button', { text: 'Suivant ›' }); next.disabled = page >= pages; next.addEventListener('click', () => goPage(page + 1));
-      $pager.appendChild(prev);
-      $pager.appendChild(el('span', { text: ` Page ${page}/${pages} ` }));
-      $pager.appendChild(next);
-    }
-
-    function sortItems(list, mode) {
-      const a = [...list];
-      switch (mode) {
-        case 'title_asc': a.sort((x, y) => (x.title || '').localeCompare(y.title || '', locale, { sensitivity: 'base' })); break;
-        case 'title_desc': a.sort((x, y) => (y.title || '').localeCompare(x.title || '', locale, { sensitivity: 'base' })); break;
-        case 'date_desc': a.sort((x, y) => (y.dateMs || 0) - (x.dateMs || 0)); break;
-        case 'date_asc': a.sort((x, y) => (x.dateMs || 0) - (y.dateMs || 0)); break;
-        default: break; // pertinence : on garde l'ordre filtré
-      }
-      return a;
-    }
-
-    function applyFilter() {
-      const q = ($q.value || '').normalize('NFD').replace(/[̀-ͯ]/gu, '').toLowerCase();
-      filtered = rawItems.filter(it => {
-        const hay = `${it.title} ${it.desc}`.normalize('NFD').replace(/[̀-ͯ]/gu, '').toLowerCase();
-        const matchesText = hay.includes(q);
-        const matchesCats = selectedCats.size === 0 || it.cats?.some(c => selectedCats.has(c));
-        return matchesText && matchesCats;
-      });
-      filtered = sortItems(filtered, currentSort);
-      currentPage = 1;
-      render(filtered, currentPage);
-      renderCategoryChips();
-    }
-
-    function goPage(p) { currentPage = Math.max(1, p); render(filtered, currentPage); }
-
-    function buildSkeletons(n = 10) {
-      $grid.innerHTML = ''; const frag = document.createDocumentFragment();
-      for (let i = 0; i < n; i++) frag.appendChild(skeletonCard()); $grid.appendChild(frag);
-    }
-
-    // ====== Categories ======
-    function computeCategoryCounts(list) {
-      const m = new Map();
-      for (const it of list) {
-        for (const c of it.cats || []) m.set(c, (m.get(c) || 0) + 1);
-      }
-      return [...m.entries()].sort((a,b) => b[1] - a[1]);
-    }
-    function renderCategoryChips() {
-      const counts = computeCategoryCounts(rawItems);
-      $filters.innerHTML = '';
-      if (!counts.length) return;
-      const reset = el('span', { class: 'chip' }); reset.appendChild(text('Tout')); if (!selectedCats.size) reset.classList.add('active');
-      reset.addEventListener('click', () => { selectedCats.clear(); applyFilter(); });
-      $filters.appendChild(reset);
-      for (const [cat, n] of counts) {
-        const chip = el('span', { class: 'chip', text: `${cat} (${n})` });
-        if (selectedCats.has(cat)) chip.classList.add('active');
-        chip.addEventListener('click', () => {
-          if (selectedCats.has(cat)) selectedCats.delete(cat); else selectedCats.add(cat);
-          applyFilter();
-        });
-        $filters.appendChild(chip);
-      }
-    }
-
-    // ====== Export ======
-    function download(name, content, type = 'application/json') {
-      const blob = new Blob([content], { type });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = name; a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    }
-    function exportVisibleJSON() { download('items-visible.json', JSON.stringify(filtered, null, 2)); }
-    function exportVisibleCSV() {
-      const rows = [['title','date','link','player','mediaUrl','categories','desc']];
-      for (const it of filtered) {
-        const row = [it.title, formatDateMs(it.dateMs), it.link, it.player, it.mediaUrl, (it.cats||[]).join('|'), it.desc];
-        rows.push(row.map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"'));
-      }
-      download('items-visible.csv', rows.map(r => r.join(',')).join('\n'), 'text/csv');
-    }
-
-    // ====== Loaders ======
-    async function loadFromUrl(url) {
-      $status.textContent = 'Chargement…'; buildSkeletons(8);
-      const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 20000);
-      try {
-        const res = await fetch(url, { headers: { 'Accept': 'application/json' }, signal: ctrl.signal });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        rawItems = parseItems(data);
-        applyFilter();
-        $openSrc.href = url; $openSrc.textContent = 'Ouvrir la source';
-      } catch (err) {
-        console.error(err);
-        $status.innerHTML = `<span class="error">Échec du chargement : ${String(err.message || err)}</span>`;
-        $grid.innerHTML = '';
-      } finally { clearTimeout(t); }
-    }
-
-    async function loadFromFile(file) {
-      $status.textContent = `Lecture du fichier local : ${file.name}`;
-      const text = await file.text();
-      try {
-        const data = JSON.parse(text);
-        rawItems = parseItems(data);
-        applyFilter();
-        $openSrc.href = '#'; $openSrc.textContent = 'Source : fichier local';
-      } catch (e) {
-        $status.innerHTML = `<span class="error">Le fichier n'est pas un JSON valide.</span>`;
-      }
-    }
-
-    // ====== Event wiring ======
-    function syncViewButtons() {
-      $viewGrid.setAttribute('aria-pressed', String(viewMode === 'grid'));
-      $viewList.setAttribute('aria-pressed', String(viewMode === 'list'));
-      document.body.classList.toggle('list', viewMode === 'list');
-    }
-
-    $q.addEventListener('input', () => applyFilter());
-    $reload.addEventListener('click', () => loadFromUrl(JSON_URL));
-    $sort.addEventListener('change', () => { currentSort = $sort.value; applyFilter(); });
-
-    $viewGrid.addEventListener('click', () => { viewMode = 'grid'; syncViewButtons(); render(filtered, currentPage); });
-    $viewList.addEventListener('click', () => { viewMode = 'list'; syncViewButtons(); render(filtered, currentPage); });
-
-    $themeBtn.addEventListener('click', () => { setBodyTheme(getCurrentTheme() === 'dark' ? 'light' : 'dark'); });
-
-    $modal.addEventListener('click', (e) => { if (e.target.hasAttribute('data-close')) closeModal(); });
-    $modalClose.addEventListener('click', closeModal);
-    function getMediaNode(){ return $modalBody.querySelector('video, iframe'); }
-    function toggleFullscreen(){
-      const el = getMediaNode() || $modal;
-      if (!document.fullscreenElement && el && el.requestFullscreen) {
-        el.requestFullscreen();
-      } else if (document.fullscreenElement && document.exitFullscreen) {
-        document.exitFullscreen();
-      }
-    }
-    if ($modalFs) $modalFs.addEventListener('click', (e)=>{ e.preventDefault(); toggleFullscreen(); });
-    $modalBody.addEventListener('dblclick', () => toggleFullscreen());
-    document.addEventListener('keydown', (e) => {
-      if (!$modal.classList.contains('show')) return;
-      if (e.key === 'Escape') { closeModal(); }
-      else if (e.key && e.key.toLowerCase() === 'f') { toggleFullscreen(); }
+    document.addEventListener('DOMContentLoaded', () => {
+      try { loadPlaylistDirectory('playlists.sample.json'); } catch (e) { console.error(e); }
     });
-
-    document.getElementById('exportJson').addEventListener('click', exportVisibleJSON);
-    document.getElementById('exportCsv').addEventListener('click', exportVisibleCSV);
-
-    $file.addEventListener('change', (e) => { const f = e.target.files?.[0]; if (f) loadFromFile(f); });
-
-    // ====== Init from URL state ======
-    (function initStateFromUrl(){
-      const qv = usp.get('q') || ''; $q.value = qv; if (usp.get('sort')) $sort.value = usp.get('sort');
-      viewMode = (usp.get('view') === 'list') ? 'list' : 'grid'; syncViewButtons();
-      const cats = (usp.get('cat') || '').split(',').map(s => s.trim()).filter(Boolean); selectedCats = new Set(cats);
-      currentPage = Math.max(1, parseInt(usp.get('page') || '1', 10));
-      setBodyTheme('dark');
-    })();
-
-    // ====== Start ======
-    renderCategoryChips();
-    loadFromUrl(JSON_URL);
   </script>
+
+  <!-- Fallback d'initialisation (YouTube + HLS + boutons + fichiers locaux) -->
   <script>
-    (function(){
-      function stripFirstSlash(s){ return (s && s.charAt(0)==='/' ) ? s.slice(1) : (s||''); }
-      function isDigits(s){ if(!s) return false; for(var i=0;i<s.length;i++){ var c=s.charCodeAt(i); if(c<48||c>57) return false; } return true; }
-      function toEmbedUrl(url){
-        if(!url) return '';
-        try{
-          var u=new URL(url, location.href);
-          var host=u.hostname;
-          if(host.endsWith('youtube.com') && u.pathname==='\/watch'){
-            var id=u.searchParams.get('v'); if(id) return 'https://www.youtube.com/embed/'+id;
-          }
-          if(host==='youtu.be' || host.endsWith('.youtu.be')){
-            var id2=stripFirstSlash(u.pathname); if(id2) return 'https://www.youtube.com/embed/'+id2;
-          }
-          if(host.endsWith('vimeo.com')){
-            var parts=u.pathname.split('/').filter(Boolean); var vid=parts[0]||''; if(isDigits(vid)) return 'https://player.vimeo.com/video/'+vid;
-          }
-          if(host.endsWith('dailymotion.com') && u.pathname.indexOf('/video/')===0){
-            var did=u.pathname.split('/').pop(); if(did) return 'https://www.dailymotion.com/embed/video/'+did;
-          }
-          return url;
-        }catch(e){ return url; }
-      }
-      function openInModalFromUrl(url){
-        if(!url) return;
-        $modalBody.innerHTML='';
-        var embed=toEmbedUrl(url);
-        if(location.protocol==='https:' && embed.toLowerCase().indexOf('http:')===0){
-          $modalBody.innerHTML='<div style="padding:16px">Lecteur bloqué (mixed content). <a class="btn" target="_blank" rel="noopener" href="'+embed+'">Ouvrir dans un onglet</a></div>';
-          openModal();
-          return;
-        }
-        var ifr=document.createElement('iframe');
-        ifr.setAttribute('src', embed);
-        ifr.setAttribute('allow','autoplay; encrypted-media; picture-in-picture');
-        ifr.setAttribute('allowfullscreen','true');
-        ifr.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
-        $modalBody.appendChild(ifr);
-        openModal();
-      }
-      document.addEventListener('click', function(ev){
-        var a=ev.target.closest('a.btn[data-modal="player"]'); if(!a) return;
-        var label=(a.textContent||'').trim();
-        if(label==='Ouvrir le lecteur'){
-          ev.preventDefault();
-          openInModalFromUrl(a.getAttribute('href'));
-        }
+  (function(){
+    let player;
+
+    function initPlayer(){
+      if (player) return player;
+      // Video.js 7 + VHS -> HLS natif ; plugin YouTube déjà chargé
+      player = videojs('player', {
+        controls: true,
+        preload: 'auto',
+        autoplay: true,
+        muted: true,
+        liveui: true,
+        fluid: true,
+        techOrder: ['html5','youtube']
       });
-    })();
+      window.__vjs = player;
+      return player;
+    }
+
+    function ytId(u){
+      try{
+        const url=new URL(u);
+        if (url.hostname.includes('youtu.be')) return url.pathname.slice(1);
+        if (url.hostname.includes('youtube.com')) return url.searchParams.get('v')||'';
+      }catch{}
+      return '';
+    }
+
+    function guessType(url){
+      const u=(url||'').split('?')[0].toLowerCase();
+      if (/(youtube\.com|youtu\.be)/i.test(url)) return 'video/youtube';
+      if (u.endsWith('.m3u8')) return 'application/x-mpegURL';
+      if (u.endsWith('.mp4'))  return 'video/mp4';
+      if (u.endsWith('.webm')) return 'video/webm';
+      if (u.endsWith('.ogg') || u.endsWith('.ogv')) return 'video/ogg';
+      if (u.endsWith('.mp3'))  return 'audio/mpeg';
+      if (u.endsWith('.mpd'))  return 'application/dash+xml'; // informatif
+      return '';
+    }
+
+    function updateNowbar(title,url,logo){
+      document.getElementById('nowPlaying').textContent = title || 'Lecture';
+      const nu = document.getElementById('nowUrl');
+      nu.textContent = url||'';
+      nu.title = url||'';
+      const img = document.getElementById('channelLogo');
+      if(logo){ img.src=logo; img.classList.remove('d-none'); } else { img.removeAttribute('src'); img.classList.add('d-none'); }
+      document.getElementById('nowbar').classList.remove('d-none');
+      document.getElementById('zapTitle').textContent = title || '—';
+    }
+
+    function pushToHistory(name, logo, url){
+      try{
+        const key='iptv_hist';
+        const arr=JSON.parse(localStorage.getItem(key)||'[]');
+        arr.unshift({t:Date.now(), name, logo, url});
+        if(arr.length>100) arr.length=100;
+        localStorage.setItem(key, JSON.stringify(arr));
+      }catch{}
+    }
+
+    function loadSource(url, logo='', name=''){
+      const p = initPlayer();
+      if(!url) return;
+
+      const type = guessType(url);
+      let src = url;
+
+      if (type === 'video/youtube') {
+        const id = ytId(url);
+        src = id ? 'https://www.youtube.com/watch?v='+id : url;
+      }
+
+      if (type === 'application/dash+xml') {
+        console.warn('DASH (.mpd) non pris en charge ici sans plugin DASH.');
+      }
+
+      try { p.pause(); } catch {}
+      p.src(type ? {src, type} : {src});
+      p.ready(() => { p.play().catch(() => {}); });
+
+      updateNowbar(name || src, url, logo);
+      pushToHistory(name || src, logo, url);
+    }
+
+    // Expose UNIQUEMENT si pas déjà fourni par tes scripts
+    if (!window.loadSource) window.loadSource = loadSource;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initPlayer();
+
+      // Bouton Lire
+      document.getElementById('btnPlay')?.addEventListener('click', ()=>{
+        const v = document.getElementById('inputUrl').value.trim();
+        if (!v) return;
+        if (/\.json(\?|#|$)/i.test(v)) { window.IPTV_JSON?.load?.(v); }
+        else { window.loadSource(v); }
+      });
+
+      // Fichier local
+      document.getElementById('inputFile')?.addEventListener('change', (e)=>{
+        const f = e.target.files?.[0]; if(!f) return;
+        const url = URL.createObjectURL(f);
+        loadSource(url, '', f.name);
+      });
+
+      // Rafraîchir
+      document.getElementById('btnRefresh')?.addEventListener('click', ()=>location.reload());
+
+      // Plein écran (page / player)
+      const pageBtn = document.getElementById('btnFsPage');
+      const playerBtn = document.getElementById('btnFsPlayer');
+      function toggleFS(el){
+        if(!document.fullscreenElement){ el?.requestFullscreen?.(); }
+        else { document.exitFullscreen?.(); }
+      }
+      pageBtn?.addEventListener('click', ()=>toggleFS(document.documentElement));
+      playerBtn?.addEventListener('click', ()=>{
+        const wrap=document.querySelector('.player-wrap')||document.getElementById('player');
+        toggleFS(wrap);
+      });
+    });
+  })();
+  </script>
+
+  <script>
+    // Si tu as un <select id="chanSelectFromJSON"> ailleurs :
+    const selJson = document.getElementById('chanSelectFromJSON');
+    if (selJson) {
+      selJson.addEventListener('change', () => {
+        const opt = selJson.selectedOptions[0];
+        if (!opt) return;
+        const url  = (opt.value || '').trim();
+        if (!url || /\.json(\?|#|$)/i.test(url)) return; // laisse les .json à l'autre chargeur
+        const logo = opt.dataset.logo || '';
+        const name = opt.textContent || '';
+        window.loadSource?.(url, logo, name);
+      });
+    }
   </script>
 </body>
 </html>
