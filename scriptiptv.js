@@ -1,4 +1,44 @@
 
+// === Compatibility shim: map old "*2" IDs to unified IDs when only one UI exists ===
+(() => {
+  const ID_MAP = {
+    sourceSelect2: 'sourceSelect',
+    customUrl2: 'customUrl',
+    btnLoadM3U2: 'btnLoadM3U',
+    m3uFile2: 'm3uFile',
+    btnCheckLinks2: 'btnCheckLinks',
+    checkProgress2: 'checkProgress',
+    checkSummary2: 'checkSummary',
+    categorySelect2: 'categorySelect',
+    search2: 'search',
+    channelList2: 'channelList',
+    plFavBtn2: 'plFavBtn1'
+  };
+  const normalize = (sel) => {
+    if (!sel || typeof sel !== 'string') return sel;
+    // Remplace #id2 par #id de base
+    for (const [oldId, newId] of Object.entries(ID_MAP)) {
+      sel = sel.replace(new RegExp(`#${oldId}(?![\\w-])`, 'g'), `#${newId}`);
+    }
+    return sel;
+  };
+  // getElementById fallback
+  const _origGEI = document.getElementById.bind(document);
+  document.getElementById = (id) => _origGEI(ID_MAP[id] || id);
+
+  // Patch querySelector / querySelectorAll on Document et Element
+  const patchQS = (proto) => {
+    const _qs = proto.querySelector;
+    proto.querySelector = function(sel){ return _qs.call(this, normalize(sel)); };
+    const _qsa = proto.querySelectorAll;
+    proto.querySelectorAll = function(sel){ return _qsa.call(this, normalize(sel)); };
+  };
+  patchQS(Document.prototype);
+  patchQS(Element.prototype);
+})();
+// === End shim ===
+
+
     // ————————————————
     // Helpers
     // ————————————————
