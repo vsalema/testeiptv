@@ -189,63 +189,7 @@
       </div>
 
       <!-- Right column (masquée ici) -->
-      <div class="d-none">
-        <aside class="card glass aside-tight">
-          <div class="card-body">
-            <div class="mb-3">
-              <!-- ⭐ Label + étoile -->
-              <label for="sourceSelect" class="form-label d-flex align-items-center justify-content-between">
-                <span>Source M3U</span>
-                <button id="plFavBtn1" type="button" class="btn btn-sm btn-star" title="Ajouter aux favoris" aria-pressed="false" aria-label="Favori">
-                  <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
-                    <path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
-                  </svg>
-                </button>
-              </label>
-              <select id="sourceSelect" class="form-select">
-                <option value="https://vsalema.github.io/streamboxv.3/playlists.json">JSON</option>
-
-                <option value="https://raw.githubusercontent.com/vsalema/tvpt4/refs/heads/main/css/TVradioZap-TV-Europe%2B_s_2024-12-27.m3u">France TV 🇫🇷</option>
-                <option value="https://raw.githubusercontent.com/vsalema/tvpt4/refs/heads/main/js/M3UPT.m3u">Portugal – plages 🇵🇹</option>
-                <option value="https://raw.githubusercontent.com/vsalema/tvpt4/refs/heads/main/css/PT.m3u">Portugal TV 🇵🇹</option>
-                <option value="https://raw.githubusercontent.com/vsalema/tvpt4/refs/heads/main/css/movies.m3u">Films 🎬</option>
-                <option value="https://raw.githubusercontent.com/Paradise-91/ParaTV/refs/heads/main/playlists/samsungtvplus/group/fr/fr.m3u">Samsung TV Plus FR</option>
-                <option value="https://iptv-org.github.io/iptv/index.m3u">IPTV Monde</option>
-                <option value="custom">(Coller un lien personnalisé…)</option>
-              </select>
-            </div>
-            <div class="mb-3 d-none" id="customUrlWrap">
-              <label for="customUrl" class="form-label">Lien M3U personnalisé</label>
-              <input id="customUrl" class="form-control" placeholder="https://…/playlist.m3u" />
-            </div>
-            <div class="d-grid gap-2">
-              <button id="btnLoadM3U" class="btn btn-outline-light">Charger la playlist</button>
-              <input id="m3uFile" class="form-control" type="file" accept=".m3u,.m3u8" />
-            </div>
-            <hr />
-            
-            <div class="d-grid gap-2 mt-2">
-              <button id="btnCheckLinks" class="btn btn-accent w-50 mx-auto">Vérifier les liens</button>
-              <div id="checkProgress" class="progress d-none" style="height:10px;">
-                <div class="progress-bar" role="progressbar" style="width:0%"></div>
-              </div>
-              <div id="checkSummary" class="tiny"></div>
-            </div>
-            
-            <div class="mb-3">
-              <label for="categorySelect" class="form-label">Catégorie</label>
-              <select id="categorySelect" class="form-select"></select>
-            </div>
-            <div>
-              <label class="form-label d-flex align-items-center justify-content-between">
-                <span>Chaînes</span>
-                <input id="search" class="form-control form-control-sm ms-3" style="max-width: 180px" placeholder="Rechercher…" />
-              </label>
-              <div id="channelList" class="list-group" style="max-height: 45vh; overflow-y:auto;"></div>
-            </div>
-          </div>
-        </aside>
-      </div>
+      
     </div>
   
 
@@ -322,15 +266,15 @@
     <div class="offcanvas-body">
       <div class="mb-3">
         <!-- ⭐ Label + étoile -->
-        <label for="sourceSelect2" class="form-label d-flex align-items-center justify-content-between">
+        <label for="sourceSelect" class="form-label d-flex align-items-center justify-content-between">
           <span>Source M3U</span>
-          <button id="plFavBtn2" type="button" class="btn btn-sm btn-star" title="Ajouter aux favoris" aria-pressed="false" aria-label="Favori">
+          <button id="plFavBtn1" type="button" class="btn btn-sm btn-star" title="Ajouter aux favoris" aria-pressed="false" aria-label="Favori">
             <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
               <path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
             </svg>
           </button>
         </label>
-        <select id="sourceSelect2" class="form-select">
+        <select id="sourceSelect" class="form-select">
          <option value="https://raw.githubusercontent.com/vsalema/tvpt4/refs/heads/main/css/TVradioZap-TV-Europe%2B_s_2024-12-27.m3u">France TV 🇫🇷</option>
           <option value="https://raw.githubusercontent.com/vsalema/tvpt4/refs/heads/main/js/M3UPT.m3u">Portugal – plages 🇵🇹</option>
           <option value="https://raw.githubusercontent.com/vsalema/tvpt4/refs/heads/main/css/PT.m3u">Portugal TV 🇵🇹</option>
@@ -340,33 +284,33 @@
           <option value="custom">(Coller un lien personnalisé…)</option>
         </select>
       </div>
-      <div class="mb-3 d-none" id="customUrlWrap2">
-        <label for="customUrl2" class="form-label">Lien M3U personnalisé</label>
-        <input id="customUrl2" class="form-control" placeholder="https://…/playlist.m3u" />
+      <div class="mb-3 d-none" id="customUrlWrap">
+        <label for="customUrl" class="form-label">Lien M3U personnalisé</label>
+        <input id="customUrl" class="form-control" placeholder="https://…/playlist.m3u" />
       </div>
       <div class="d-grid gap-2 mb-3">
-        <button id="btnLoadM3U2" class="btn btn-outline-light">Charger la playlist</button>
-        <input id="m3uFile2" class="form-control" type="file" accept=".m3u,.m3u8" />
+        <button id="btnLoadM3U" class="btn btn-outline-light">Charger la playlist</button>
+        <input id="m3uFile" class="form-control" type="file" accept=".m3u,.m3u8" />
       </div>
       
       <div class="d-grid gap-2 mb-3">
-        <button id="btnCheckLinks2" class="btn btn-accent w-50 mx-auto">Vérifier les liens</button>
-        <div id="checkProgress2" class="progress d-none" style="height:10px;">
+        <button id="btnCheckLinks" class="btn btn-accent w-50 mx-auto">Vérifier les liens</button>
+        <div id="checkProgress" class="progress d-none" style="height:10px;">
           <div class="progress-bar" role="progressbar" style="width:0%"></div>
         </div>
-        <div id="checkSummary2" class="tiny"></div>
+        <div id="checkSummary" class="tiny"></div>
       </div>
       
       <div class="mb-3">
-        <label for="categorySelect2" class="form-label">Catégorie</label>
-        <select id="categorySelect2" class="form-select"></select>
+        <label for="categorySelect" class="form-label">Catégorie</label>
+        <select id="categorySelect" class="form-select"></select>
       </div>
       <div>
         <label class="form-label d-flex align-items-center justify-content-between">
           <span>Chaînes</span>
-          <input id="search2" class="form-control form-control-sm ms-3" style="max-width: 180px" placeholder="Rechercher…" />
+          <input id="search" class="form-control form-control-sm ms-3" style="max-width: 180px" placeholder="Rechercher…" />
         </label>
-        <div id="channelList2" class="list-group" style="max-height: 50vh; overflow-y:auto;"></div>
+        <div id="channelList" class="list-group" style="max-height: 50vh; overflow-y:auto;"></div>
       </div>
     </div>
   </div>
