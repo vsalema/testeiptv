@@ -16,7 +16,32 @@
   <link href="https://vjs.zencdn.net/7.21.1/video-js.css" rel="stylesheet" />
   <script src="https://vjs.zencdn.net/7.21.1/video.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/videojs-youtube@3/dist/Youtube.min.js"></script>
+<style>
+  /* Tailles réglables (une valeur → partout) */
+  :root{
+    --ch-logo-size: 40px;  /* logos dans les LISTES */
+    --nb-logo-size: 44px;  /* logo dans la NOWBAR */
+  }
 
+  /* Logos dans les listes de chaînes (panneau, inline) */
+  #channelList img,
+  #channelList2 img,
+  #inlineChannelList img{
+    width: var(--ch-logo-size) !important;
+    height: var(--ch-logo-size) !important;
+    object-fit: contain;
+    flex: 0 0 var(--ch-logo-size);
+    aspect-ratio: 1 / 1;   /* carré, pas obligatoire */
+    margin-right: .5rem;   /* espace avant le titre */
+  }
+
+  /* Logo de la barre “Maintenant” (nowbar) */
+  #nowbar img.logo{
+    width: var(--nb-logo-size) !important;
+    height: var(--nb-logo-size) !important;
+    object-fit: contain;
+  }
+</style>
   
 </head>
 <body>
