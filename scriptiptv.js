@@ -1,40 +1,35 @@
-
-// === Compatibility shim: map old "*2" IDs to unified IDs when only one UI exists ===
+// === Minimal ID fallback shim (2 → base) ===
 (() => {
-  const ID_MAP = {
-    sourceSelect2: 'sourceSelect',
-    customUrl2: 'customUrl',
-    btnLoadM3U2: 'btnLoadM3U',
-    m3uFile2: 'm3uFile',
-    btnCheckLinks2: 'btnCheckLinks',
-    checkProgress2: 'checkProgress',
-    checkSummary2: 'checkSummary',
-    categorySelect2: 'categorySelect',
-    search2: 'search',
-    channelList2: 'channelList',
-    plFavBtn2: 'plFavBtn1'
-  };
-  const normalize = (sel) => {
-    if (!sel || typeof sel !== 'string') return sel;
-    // Remplace #id2 par #id de base
-    for (const [oldId, newId] of Object.entries(ID_MAP)) {
-      sel = sel.replace(new RegExp(`#${oldId}(?![\\w-])`, 'g'), `#${newId}`);
-    }
-    return sel;
-  };
-  // getElementById fallback
-  const _origGEI = document.getElementById.bind(document);
-  document.getElementById = (id) => _origGEI(ID_MAP[id] || id);
+  const fallbackId = (id) => (typeof id === 'string' && id.endsWith('2')) ? id.slice(0, -1) : null;
 
-  // Patch querySelector / querySelectorAll on Document et Element
-  const patchQS = (proto) => {
-    const _qs = proto.querySelector;
-    proto.querySelector = function(sel){ return _qs.call(this, normalize(sel)); };
-    const _qsa = proto.querySelectorAll;
-    proto.querySelectorAll = function(sel){ return _qsa.call(this, normalize(sel)); };
+  // getElementById fallback: try base ID if "*2" not found
+  const _gei = Document.prototype.getElementById;
+  Document.prototype.getElementById = function(id){
+    const el = _gei.call(this, id);
+    if (el) return el;
+    const fb = fallbackId(id);
+    return fb ? _gei.call(this, fb) : null;
   };
-  patchQS(Document.prototype);
-  patchQS(Element.prototype);
+
+  // querySelector fallback only for simple "#id2" selectors
+  const _qs = Document.prototype.querySelector;
+  Document.prototype.querySelector = function(sel){
+    let el = _qs.call(this, sel);
+    if (el || typeof sel !== 'string' || !sel.startsWith('#')) return el;
+    const id = sel.slice(1);
+    const fb = fallbackId(id);
+    return fb ? _qs.call(this, '#'+fb) : null;
+  };
+
+  // querySelectorAll fallback similarly
+  const _qsa = Document.prototype.querySelectorAll;
+  Document.prototype.querySelectorAll = function(sel){
+    let list = _qsa.call(this, sel);
+    if ((list && list.length) || typeof sel !== 'string' || !sel.startsWith('#')) return list;
+    const id = sel.slice(1);
+    const fb = fallbackId(id);
+    return fb ? _qsa.call(this, '#'+fb) : list;
+  };
 })();
 // === End shim ===
 
@@ -367,6 +362,22 @@ btnFsPlayer?.addEventListener('click', togglePlayerFullscreen);
     function loadSource(url, logo='', name='') {
       if (!url) return;
       const type = detectType(url);
+// — Force unmute for YouTube when user selected a channel
+try {
+  const isYT = (type === 'video/youtube') || /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i.test(url);
+  if (isYT) {
+    player.one('playing', () => {
+      try { player.muted(false); player.volume(1); } catch(_){}
+      try {
+        const tech = player.tech_ || (player.tech && player.tech(true));
+        const ytp = tech && (tech.ytPlayer || tech.player);
+        if (ytp && typeof ytp.unMute === 'function') ytp.unMute();
+        if (ytp && typeof ytp.setVolume === 'function') ytp.setVolume(100);
+      } catch(_){}
+    });
+  }
+} catch(_){}
+
 
       if (type === 'application/dash+xml') {
         console.warn('Flux DASH détecté (.mpd). Si la lecture échoue, utilisez un flux HLS (.m3u8) ou MP4.');
