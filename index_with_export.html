@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>STREAMBOX IPTV LIVE</title>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <!-- Bootstrap 5 (unique version) -->
+  
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://vsalema.github.io/tvpt4/css/glass-theme.css?v=1.0.0">
+  <link rel="stylesheet" href="https://vsalema.github.io/tvpt4/css/nav-responsive.css?v=1">
+  <!-- Video.js (unique version) + plugin YouTube -->
+  <link href="https://vjs.zencdn.net/7.21.1/video-js.css" rel="stylesheet" />
+  <script src="https://vjs.zencdn.net/7.21.1/video.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/videojs-youtube@3/dist/Youtube.min.js"></script>
+<style>
+  /* Tailles réglables (une valeur → partout) */
+  :root{
+    --ch-logo-size: 60px;  /* logos dans les LISTES */
+    --nb-logo-size: 44px;  /* logo dans la NOWBAR */
+  }
+
+  /* Logos dans les listes de chaînes (panneau, inline) */
+  #channelList img,
+  #channelList2 img,
+  #inlineChannelList img{
+    width: var(--ch-logo-size) !important;
+    height: var(--ch-logo-size) !important;
+    object-fit: contain;
+    flex: 0 0 var(--ch-logo-size);
+    aspect-ratio: 1 / 1;   /* carré, pas obligatoire */
+    margin-right: .5rem;   /* espace avant le titre */
+  }
+
+  /* Logo de la barre “Maintenant” (nowbar) */
+  #nowbar img.logo{
+    width: var(--nb-logo-size) !important;
+    height: var(--nb-logo-size) !important;
+    object-fit: contain;
+  }
+</style>
+  
+</head>
+<body>
+  <!-- Top bar -->
+  <nav class="navbar navbar-dark glass">
+    <div class="container-fluid gap-2">
+      <a class="brand navbar-brand d-flex align-items-center gap-2 me-2 nav-left" href="#">
+        <img
+          src="https://vsalema.github.io/tvpt4/css/logogreen.png"
+          alt="Logo"
+          class="brand-logo"
+          width="26"
+          height="26"
+          decoding="async"
+          draggable="false"
+        />
+        STREAMBOX IPTV LIVE
+      </a>
+
+      <!-- FORMULAIRE DANS LA TOPBAR -->
+      <form class="d-flex align-items-center gap-2 nav-center"
+  role="search"
+  onsubmit="event.preventDefault();
+    const v = document.getElementById('inputUrl').value.trim();
+    if (!v) return;
+    if (/\.json(\?|#|$)/i.test(v)) { window.IPTV_JSON?.load?.(v); }
+    else { window.loadSource?.(v); }">
+        <label for="inputUrl" class="visually-hidden">Lire une URL</label>
+        <input id="inputUrl" type="url" inputmode="url" class="form-control form-control-sm topbar-url" placeholder="URL (.m3u8/.mp4/.mp3/.mpd/YouTube)" />
+        <button id="btnPlay" type="button" class="btn btn-accent btn-sm">Lire</button>
+        <label for="inputFile" class="btn btn-outline-light btn-sm mb-0">Fichier…</label>
+        <input id="inputFile" class="form-control d-none" type="file" accept="video/*,audio/*" />
+      </form>
+
+      <div class="d-flex gap-2 align-items-center nav-right">
+  <button id="btnRefresh" type="button" class="btn btn-accent btn-sm btn-refresh" title="Rafraîchir la page" aria-label="Rafraîchir la page">
+    <svg class="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M17.65 6.35a8 8 0 1 0 2.3 7.11 1 1 0 0 0-1.96-.39 6 6 0 1 1-1.73-5.33l-1.79 1.79a1 1 0 0 0 .7 1.7H22a1 1 0 0 0 1-1V2.99a1 1 0 0 0-1.7-.7l-1.65 1.65a9.96 9.96 0 0 0-2 2.41Z"/>
+    </svg>
+    <span class="d-none d-sm-inline"></span>
+  </button>
+
+  <!-- 🔸 Boutons rapides -->
+  <button id="btnQuickFav" type="button" class="btn btn-outline-light btn-sm" title="Ouvrir le panneau sur Favoris">
+    <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
+      <path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+    </svg>
+    <span class="d-none d-sm-inline ms-1"></span>
+  </button>
+
+  <button id="btnQuickHist" type="button" class="btn btn-outline-light btn-sm" title="Ouvrir le panneau sur Historique">
+    <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
+      <path d="M13 3a9 9 0 1 0 9 9h-2a7 7 0 1 1-2.05-4.95L15 7v6h6l-.02-2h-4V5.5A8.98 8.98 0 0 0 13 3z"/>
+    </svg>
+    <span class="d-none d-sm-inline ms-1"></span>
+  </button>
+<!-- Apparence -->
+
+
+  <button class="btn btn-outline-light btn-sm" data-bs-toggle="offcanvas" data-bs-target="#panel" aria-controls="panel">
+    Playlist &amp; Chaînes
+  </button><div class="dropdown">
+  <button id="btnAppearance" class="btn btn-outline-light btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+    <svg class="icon me-1" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+      <!-- icône “contraste” simple -->
+      <path d="M12 2a10 10 0 1 0 0 20V2z"/>
+    </svg>
+    
+  </button>
+  <div class="dropdown-menu dropdown-menu-end p-2" style="min-width:220px">
+    <div class="form-check mb-1">
+      <input class="form-check-input" type="radio" name="themeRadios" id="thAuto" value="auto">
+      <label class="form-check-label" for="thAuto">Auto (système)</label>
+    </div>
+    <div class="form-check mb-1">
+      <input class="form-check-input" type="radio" name="themeRadios" id="thLight" value="light">
+      <label class="form-check-label" for="thLight">Clair</label>
+    </div>
+    <div class="form-check mb-2">
+      <input class="form-check-input" type="radio" name="themeRadios" id="thDark" value="dark">
+      <label class="form-check-label" for="thDark">Sombre</label>
+    </div>
+    <hr class="my-2">
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" id="hcToggle">
+      <label class="form-check-label" for="hcToggle">Contraste élevé</label>
+    </div>
+  </div>
+</div>
+</div>    
+ </div>
+  </nav>
+
+  <!-- Main content -->
+  <main class="container py-3 py-md-4">
+    <div class="row g-4">
+      <div class="col-12">
+        <div class="player-wrap">
+          <!-- VideoJS player -->
+          <video id="player" class="video-js vjs-big-play-centered vjs-fill" controls preload="auto" autoplay loop poster="https://raw.githubusercontent.com/imagesloads/images/refs/heads/main/img_4b6157ae02c87afb.gif"  muted playsinline><!-- <source src="https://vsalema.github.io/tvpt4/css/seedance-1-0-lite.mp4" /> -->
+            <!-- Le <source> sera défini par JS -->
+          </video>
+
+          <!-- ✨ NOWBAR -->
+          <div id="nowbar" class="nowbar d-none" aria-live="polite">
+            <img id="channelLogo" class="logo d-none" alt="Logo chaîne" />
+            <div class="meta">
+              <h5 id="nowPlaying" class="np-title">Aucune chaîne en cours</h5>
+              <div id="nowUrl" class="np-url text-truncate"></div>
+            </div>
+          </div>
+          <!-- /NOWBAR -->
+            <!-- 🔎 Mini player dock (aperçu) -->
+            <div id="miniDock" class="mini-dock d-none" aria-hidden="true">
+              <video id="miniPlayer" class="video-js vjs-fill" muted playsinline preload="auto"></video>
+            </div>
+
+        </div>
+
+        <!-- 🔁 ZAPBAR -->
+        <div id="zapbar" class="zapbar glass" aria-live="polite">
+          <button id="btnFsPage" type="button" class="btn btn-outline-light btn-sm" title="Plein écran — page" aria-pressed="false">
+  <svg class="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M7 14H5v5h5v-2H7v-3Zm0-4h2V7h3V5H7v5Zm10 7h-3v2h5v-5h-2v3Zm2-12h-5v2h3v3h2V5Z"/>
+  </svg>
+  <span class="d-none d-sm-inline">Page</span>
+</button>
+          
+          <button id="btnPrev" type="button" class="btn btn-outline-light btn-sm" title="Chaîne précédente" aria-label="Chaîne précédente">
+            <svg class="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+            <span class="d-none d-sm-inline">Précédent</span>
+          </button>
+          <div id="zapTitle" class="zap-title text-truncate">—</div>
+          <button id="btnNext" type="button" class="btn btn-accent btn-sm" title="Chaîne suivante" aria-label="Chaîne suivante">
+            <span class="d-none d-sm-inline">Suivant</span>
+            <svg class="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m10 6 1.41 1.41L8.83 10H18v2H8.83l2.58 2.59L10 16l-6-6z"/></svg>
+          </button>
+        <button id="btnFsPlayer" type="button" class="btn btn-outline-light btn-sm" title="Plein écran — player" aria-pressed="false">
+  <svg class="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M7 14H5v5h5v-2H7v-3Zm0-4h2V7h3V5H7v5Zm10 7h-3v2h5v-5h-2v3Zm2-12h-5v2h3v3h2V5Z"/>
+  </svg>
+  <span class="d-none d-sm-inline">Player</span>
+</button>
+        </div>
+      </div>
+
+      <!-- Right column (masquée ici) -->
+      
+    </div>
+  
+
+<!-- ===== Inline Panel à droite du player ===== -->
+<aside id="inlinePanel" class="inline-panel glass aside-tight d-none" aria-hidden="true">
+  <div class="p-2 d-flex align-items-center justify-content-between">
+    <strong class="small">Playlist &amp; Chaînes</strong>
+    <button id="inlineClose" type="button" class="btn btn-outline-light btn-sm" title="Fermer">Fermer</button>
+  </div>
+  <div class="px-2 pb-2">
+    <div class="mb-2">
+      <label class="form-label mb-1">Catégorie</label>
+      <select id="inlineCategorySelect" class="form-select form-select-sm">
+       
+      </select>
+    </div>
+    <div class="mb-2">
+      <input id="inlineSearch" class="form-control form-control-sm" placeholder="Rechercher…" />
+    </div>
+    <div id="inlineChannelList" class="list-group" style="max-height:60vh; overflow-y:auto;"></div>
+  </div>
+</aside>
+
+</main>
+
+  <!-- Offcanvas panel (mobile / tablet) -->
+  <div class="offcanvas offcanvas-start glass aside-tight" tabindex="-1" id="panel" aria-labelledby="panelLabel">
+   <div class="offcanvas-header align-items-center gap-2">
+  <!-- Garde le titre pour l’accessibilité, mais caché -->
+  <h5 id="panelLabel" class="offcanvas-title visually-hidden">Playlist &amp; Chaînes</h5>
+
+  <div class="btn-group btn-group-sm" role="group" aria-label="Listes rapides">
+    <button id="btnListFav" type="button" class="btn btn-outline-light btn-tab" data-listmode="favorites" title="Voir mes chaînes favorites">
+      <svg class="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" width="16" height="16">
+        <path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+      </svg>
+      <span class="d-none d-sm-inline ms-1">Favoris</span>
+    </button>
+    <button id="btnListHist" type="button" class="btn btn-outline-light btn-tab" data-listmode="history" title="Voir l’historique de lecture">
+      <svg class="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" width="16" height="16">
+        <path d="M13 3a9 9 0 1 0 9 9h-2a7 7 0 1 1-2.05-4.95L15 7v6h6l-.02-2h-4V5.5A8.98 8.98 0 0 0 13 3z"/>
+      </svg>
+      <span class="d-none d-sm-inline ms-1">Historique</span>
+    </button>
+  <button id="btnExportData" type="button" class="btn btn-outline-light btn-sm" title="Exporter favoris & historique">
+  <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
+    <path d="M5 20h14v-2H5v2Zm7-16-5 5h3v6h4V9h3l-5-5Z"/>
+  </svg>
+  <span class="d-none d-sm-inline ms-1">Exporter</span>
+</button>
+
+<button id="btnImportData" type="button" class="btn btn-outline-light btn-sm" title="Importer depuis un fichier JSON">
+  <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
+    <path d="M5 20h14v-2H5v2Zm7-16 5 5h-3v6h-4V9H7l5-5Z"/>
+  </svg>
+  <span class="d-none d-sm-inline ms-1">Importer</span>
+</button>
+<input id="importFile" type="file" accept="application/json" class="d-none" />
+     
+     
+     </div>
+
+     
+ <!-- Bouton Effacer l'historique (caché par défaut) -->
+<button id="btnClearHist" type="button" class="btn btn-outline-light btn-sm d-none" title="Effacer tout l’historique">
+  <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
+    <path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12Zm3.46-9h1.5v8h-1.5v-8Zm4 0h1.5v8h-1.5v-8ZM15.5 4 14 2h-4L8.5 4H4v2h16V4h-4.5Z"/>
+  </svg>
+  <span class="d-none d-sm-inline ms-1"></span>
+</button>
+  <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="offcanvas" aria-label="Fermer"></button>
+</div>
+
+    <div class="offcanvas-body">
+      <div class="mb-3">
+        <!-- ⭐ Label + étoile -->
+        <label for="sourceSelect" class="form-label d-flex align-items-center justify-content-between">
+          <span>Source M3U</span>
+          <button id="plFavBtn1" type="button" class="btn btn-sm btn-star" title="Ajouter aux favoris" aria-pressed="false" aria-label="Favori">
+            <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
+              <path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+            </svg>
+          </button>
+        </label>
+        <select id="sourceSelect" class="form-select">
+         <option value="https://raw.githubusercontent.com/vsalema/tvpt4/refs/heads/main/css/TVradioZap-TV-Europe%2B_s_2024-12-27.m3u">France TV 🇫🇷</option>
+          <option value="https://raw.githubusercontent.com/vsalema/tvpt4/refs/heads/main/css/PT.m3u">Portugal TV 🇵🇹</option>
+          <option value="https://vsalema.github.io/tvpt4/css/movies.m3u">Films 🎬</option>
+          <option value="https://vsalema.github.io/tvpt4/css/movies-2_strict.m3u">Movies 🎬</option>
+          <option value="https://vsalema.github.io/tvpt4/css/animation_strict.m3u">Animation</option>
+          <option value="https://vsalema.github.io/tvpt4/css/general_cleaned.m3u">General</option>
+          <option value="vsalema.github.io/tvpt4/css/entertainment_strict.m3u">Entertainment</option>
+          <option value="vsalema.github.io/tvpt4/css/index_strict.m3u">IPTV Monde</option>
+          <option value="custom">(Coller un lien personnalisé…)</option>
+        </select>
+      </div>
+      <div class="mb-3 d-none" id="customUrlWrap">
+        <label for="customUrl" class="form-label">Lien M3U personnalisé</label>
+        <input id="customUrl" class="form-control" placeholder="https://…/playlist.m3u" />
+      </div>
+      <div class="d-grid gap-2 mb-3">
+        <button id="btnLoadM3U" class="btn btn-outline-light">Charger la playlist</button>
+        <input id="m3uFile" class="form-control" type="file" accept=".m3u,.m3u8" />
+      </div>
+      
+      <div class="d-grid gap-2 mb-3">
+        <button id="btnCheckLinks" class="btn btn-accent w-50 mx-auto">Vérifier les liens</button>
+        <div id="checkProgress" class="progress d-none" style="height:10px;">
+          <div class="progress-bar" role="progressbar" style="width:0%"></div>
+        </div>
+        <div id="checkSummary" class="tiny"></div>
+      </div>
+      
+      <div class="mb-3">
+        <label for="categorySelect" class="form-label">Catégorie</label>
+        <select id="categorySelect" class="form-select"></select>
+      </div>
+      <div>
+        <label class="form-label d-flex align-items-center justify-content-between">
+          <span>Chaînes</span>
+          <input id="search" class="form-control form-control-sm ms-3" style="max-width: 180px" placeholder="Rechercher…" />
+        </label>
+        <div id="channelList" class="list-group" style="max-height: 50vh; overflow-y:auto;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- À coller juste avant 
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      try { loadPlaylistDirectory('playlists.sample.json'); } catch (e) { console.error(e); }
+    });
+  </script>
+
+
+  <script src="exporter_ok_cors_v4.js" defer></script>
+</body> si pas déjà présent par le script -->
+<div id="ctxMenu" class="ctx-menu glass d-none" role="menu" aria-hidden="true">
+  <button type="button" data-act="play">Lire</button>
+  <button type="button" data-act="fav">Ajouter aux favoris</button>
+  <button type="button" data-act="copy">Copier l’URL</button>
+  <button type="button" data-act="open">Ouvrir dans un nouvel onglet</button>
+</div>
+  <!-- Bootstrap JS -->
+  <script src="./scriptiptv.js" defer></script>
+<script src="./json-playlist.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      try { loadPlaylistDirectory('playlists.sample.json'); } catch (e) { console.error(e); }
+    });
+  </script>
+<script>
+  const selJson = document.getElementById('chanSelectFromJSON'); // l’id de ton <select> de CHAÎNES
+if (selJson) {
+  selJson.addEventListener('change', () => {
+    const opt = selJson.selectedOptions[0];
+    if (!opt) return;
+
+    const url  = (opt.value || '').trim();
+    if (!url || /\.json(\?|#|$)/i.test(url)) return; // ne pas traiter les playlists .json ici
+
+    const logo = opt.dataset.logo || '';
+    const name = opt.textContent || '';
+    window.loadSource?.(url, logo, name);
+  });
+}
+
+</script>
+</body>
+</html>
