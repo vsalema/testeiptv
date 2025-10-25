@@ -251,7 +251,7 @@ main.container{ min-height: calc(100svh - var(--navH)); }
    ============================== */
 .form-control, .form-select, .input-group-text{
   background: rgba(15, 20, 27, .45);
-  border: 1px solid rgba(255,255,255,.16);
+  border: 1px solid rgba(15, 15, 15, 0.63);
   color: var(--text);
   border-radius: 12px;
   backdrop-filter: blur(10px);
