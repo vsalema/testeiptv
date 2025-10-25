@@ -1,5 +1,7 @@
 
-// exporter_ok_cors.js — Exporte CSV, M3U (✅), et M3U (✅ + CORS/YT)
+// exporter_ok_cors_v2.js — corrige la détection du badge statut ('.link-status')
+// Boutons: CSV, M3U (✅), M3U (✅ + CORS/YT) + fallback auto si 0 OK.
+
 (function () {
   function downloadText(filename, text) {
     const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
@@ -13,8 +15,6 @@
   }
 
   // ===== Collecte des résultats =====
-
-  // 1) Via variable globale (si dispo)
   function collectFromGlobal(){
     if (!Array.isArray(window.verificationResults)) return [];
     return window.verificationResults
@@ -22,7 +22,6 @@
       .map(r => {
         const raw = String(r.status || r.state || r.ok || '').trim();
         const norm = raw.toUpperCase().replace('✅','OK').replace('❌','FAIL').replace('⚠️','WARN');
-        // Essaie d'inférer un label (OK/CORS/HS/YT) si possible
         let label = '';
         if (/^OK$/i.test(raw)) label = 'OK';
         else if (/CORS/i.test(raw)) label = 'CORS';
@@ -32,14 +31,11 @@
         return {
           title: r.title || r.name || r.channel || (r.url.split('/').pop() || ''),
           url: r.url,
-          status: norm,   // OK / WARN / FAIL
-          label,          // OK / CORS / HS / YT / WARN / ''
-          note: r.note || r.reason || ''
+          status: norm, label, note: r.note || r.reason || ''
         };
       });
   }
 
-  // 2) Via tableau DOM (si présent)
   function collectFromTable(){
     const roots = Array.from(document.querySelectorAll('table, .results, .verify, #results, #verify'));
     const rows = roots.flatMap(t => Array.from(t.querySelectorAll('tr')));
@@ -47,7 +43,6 @@
     for (const tr of rows) {
       const text = (tr.textContent || '').trim();
       if (!/(✅|⚠️|❌|\bOK\b|\bWARN\b|\bFAIL\b)/i.test(text)) continue;
-      // URL
       let url = '';
       const a = tr.querySelector('a[href^="http"]');
       if (a) url = a.getAttribute('href');
@@ -56,12 +51,10 @@
         if (m) url = m[0].replace(/[\s>'"\)\]]+$/, '');
       }
       if (!url) continue;
-      // Statut & label
       let status = 'WARN', label = 'WARN';
       if (/✅|\bOK\b/i.test(text)) { status = 'OK'; label = 'OK'; }
       else if (/⚠️|\bWARN\b/i.test(text)) { status = 'WARN'; label = 'WARN'; }
       else if (/❌|\bFAIL\b|\bERROR\b/i.test(text)) { status = 'FAIL'; label = 'HS'; }
-      // Titre
       const titleCell = tr.querySelector('[data-title], .title, td:nth-child(2)');
       const title = (titleCell && titleCell.textContent) ? titleCell.textContent.trim() : (url.split('/').pop() || '');
       out.push({ title, url, status, label, note: '' });
@@ -69,7 +62,7 @@
     return out;
   }
 
-  // 3) Via liste de chaînes (boutons avec badge) — cas de ton script
+  // Liste canaux (boutons). Statut = span.link-status à l'intérieur.
   function collectFromListGroup(){
     const roots = Array.from(document.querySelectorAll('#channelList1, #channelList2, #inlineChannelList, .list-group'));
     const btns = roots.flatMap(r => Array.from(r.querySelectorAll('button[data-url]')));
@@ -79,18 +72,19 @@
       const url  = decodeURIComponent(btn.getAttribute('data-url')  || '');
       const name = decodeURIComponent(btn.getAttribute('data-name') || '') || (url.split('/').pop() || '');
       if (!url) continue;
-      const badge = btn.querySelector('.badge');
-      const raw = (badge && (badge.textContent||'').trim().toUpperCase()) || '';
-      // Map vers status + label
+      // Priorité: .link-status (créé par setItemStatus). Fallback: une .badge non .badge-geo
+      let statusEl = btn.querySelector('.link-status');
+      if (!statusEl) statusEl = btn.querySelector('.badge:not(.badge-geo)');
+      const raw = (statusEl && (statusEl.textContent||'').trim().toUpperCase()) || '';
       let status, label;
       if (raw === 'OK' || raw === '✅') { status = 'OK';   label = 'OK'; }
       else if (raw === 'CORS')         { status = 'WARN'; label = 'CORS'; }
       else if (raw === 'YT')           { status = 'WARN'; label = 'YT'; }
       else if (raw === 'HS' || raw === '❌' || raw === 'FAIL') { status = 'FAIL'; label = 'HS'; }
-      else                            { status = '';     label = ''; } // inconnu ou non vérifié
+      else                            { status = '';     label = ''; }
       out.push({ title: name, url, status, label, note: '' });
     }
-    // Déduplique par URL avec priorité (OK > CORS > YT > WARN > FAIL > '')
+    // Dédupe URL avec priorité (OK > CORS > YT > WARN > FAIL > '')
     const rank = r => (r.status==='OK'?5 : r.label==='CORS'?4 : r.label==='YT'?3 : r.status==='WARN'?2 : r.status==='FAIL'?1 : 0);
     const best = new Map();
     for (const r of out) {
@@ -110,8 +104,7 @@
     return [];
   }
 
-  // ===== Formats d'export =====
-
+  // ===== Exports =====
   function toCSV(rows){
     const header = ['title','url','status','label','note'];
     const esc = s => {
@@ -136,10 +129,9 @@
     return { text: lines.join('\n'), count: keep.length };
   }
 
-  // ===== UI : 3 boutons =====
-
+  // ===== UI =====
   function ensureButtons(){
-    if (document.getElementById('btnExportCSV')) return; // déjà en place
+    if (document.getElementById('btnExportCSV')) return;
 
     const bar = document.createElement('div');
     bar.style.position = 'fixed';
@@ -163,21 +155,28 @@
 
     btnCSV.addEventListener('click', () => {
       const rows = collectResults();
-      if (!rows.length) { alert("Aucun résultat détecté. Lance d'abord la vérification puis réessaie."); return; }
+      if (!rows.length) { alert(\"Aucun résultat détecté. Lance d'abord la vérification.\"); return; }
       downloadText('verification_report.csv', toCSV(rows));
     });
 
     btnOK.addEventListener('click', () => {
       const rows = collectResults();
-      if (!rows.length) { alert("Aucun résultat détecté. Lance d'abord la vérification puis réessaie."); return; }
+      if (!rows.length) { alert(\"Aucun résultat détecté. Lance d'abord la vérification.\"); return; }
       const { text, count } = toM3U(rows, { includeCors: false });
-      if (!count) { alert('Aucun lien OK.'); return; }
+      if (!count) {
+        if (confirm('Aucun lien OK. Essayer avec OK + CORS ?')) {
+          const alt = toM3U(rows, { includeCors: true });
+          if (!alt.count) { alert('Toujours aucun lien OK/CORS.'); return; }
+          downloadText('valid_ok_plus_cors.m3u', alt.text);
+        }
+        return;
+      }
       downloadText('valid_only.m3u', text);
     });
 
     btnOKC.addEventListener('click', () => {
       const rows = collectResults();
-      if (!rows.length) { alert("Aucun résultat détecté. Lance d'abord la vérification puis réessaie."); return; }
+      if (!rows.length) { alert(\"Aucun résultat détecté. Lance d'abord la vérification.\"); return; }
       const { text, count } = toM3U(rows, { includeCors: true });
       if (!count) { alert('Aucun lien OK/CORS.'); return; }
       downloadText('valid_ok_plus_cors.m3u', text);
