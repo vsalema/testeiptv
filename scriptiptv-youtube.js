@@ -209,29 +209,35 @@
    youtube: { playsinline: 1, iv_load_policy: 3, ytControls: 2 }
 });
 // === YouTube Inline Overlay (exactement par-dessus Video.js) ===
-/* === YouTube Inline Overlay (API officielle, unmute auto sans bouton) === */
+/* === YouTube Inline: init 100% au clic (anti-blocage) === */
 (function(){
   const host = document.querySelector('.player-wrap') || (player && player.el && player.el().parentElement) || document.body;
 
-  // ---------- Overlay exactement sur le player
+  // Overlay pile sur le player
   let overlay = document.getElementById('ytInlineOverlay');
-  let frameHost = document.getElementById('ytInlineFrame');
+  let mount   = document.getElementById('ytInlineFrame');
   if (!overlay) {
     overlay = document.createElement('div');
     overlay.id = 'ytInlineOverlay';
-    overlay.setAttribute('aria-hidden','true');
     Object.assign(overlay.style, {
-      position:'absolute', inset:'0', zIndex:'20', display:'none', background:'#000'
+      position:'absolute', inset:'0', zIndex:'20', display:'none',
+      background:'#000', color:'#fff', display:'none', alignItems:'center', justifyContent:'center',
+      cursor:'pointer', textAlign:'center', padding:'1rem'
     });
-    frameHost = document.createElement('div');
-    frameHost.id = 'ytInlineFrame';
-    Object.assign(frameHost.style, { width:'100%', height:'100%' });
-    if (host && getComputedStyle(host).position === 'static') host.style.position = 'relative';
-    overlay.appendChild(frameHost);
+    if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+    mount = document.createElement('div');
+    mount.id = 'ytInlineFrame';
+    Object.assign(mount.style, { width:'100%', height:'100%' });
+    const label = document.createElement('div');
+    label.id = 'ytTapLabel';
+    label.textContent = '▶️ Cliquer pour lancer YouTube';
+    label.style.opacity = '0.85';
+    overlay.appendChild(mount);
+    overlay.appendChild(label);
     host.appendChild(overlay);
   }
 
-  // ---------- Helpers YouTube
+  // Mini helpers
   function isYT(u){ return !!u && /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i.test(String(u)); }
   function ytId(u){
     if (!u) return '';
@@ -243,132 +249,87 @@
     return '';
   }
 
-  // ---------- Charge l’API IFrame YouTube une seule fois
+  // Charge l’API IFrame YT
   let ytApiReady = null;
   function ensureYTAPI(){
     if (ytApiReady) return ytApiReady;
-    ytApiReady = new Promise((resolve)=>{
-      if (window.YT && window.YT.Player) return resolve();
-      const tag = document.createElement('script');
-      tag.src = 'https://www.youtube.com/iframe_api';
-      document.head.appendChild(tag);
+    ytApiReady = new Promise(res=>{
+      if (window.YT && window.YT.Player) return res();
+      const s = document.createElement('script');
+      s.src = 'https://www.youtube.com/iframe_api';
+      document.head.appendChild(s);
       const prev = window.onYouTubeIframeAPIReady;
-      window.onYouTubeIframeAPIReady = function(){
-        try { prev && prev(); } catch(_){}
-        resolve();
-      };
+      window.onYouTubeIframeAPIReady = function(){ try{ prev&&prev(); }catch(_){ } res(); };
     });
     return ytApiReady;
   }
 
-  // ---------- Fenêtre de geste utilisateur (2 s)
-  const GESTURE_MS = 2000;
-  let lastGestureAt = 0;
-  window.addEventListener('pointerdown', () => { lastGestureAt = Date.now(); }, true);
-
-  // ---------- Player instance
   let ytPlayer = null;
-  window.ytPlayer = ytPlayer;
+  let pendingId = null;
 
-  function unmuteNow(){
-    try {
-      if (!ytPlayer) return false;
-      ytPlayer.unMute && ytPlayer.unMute();
-      ytPlayer.setVolume && ytPlayer.setVolume(100);
-      ytPlayer.playVideo && ytPlayer.playVideo();
-      return true;
-    } catch { return false; }
-  }
-
-  function tryUnmuteWithRetry(timeoutMs=2000){
-    const t0 = Date.now();
-    const tick = () => {
-      if (unmuteNow()) return; // réussi
-      if (Date.now()-t0 >= timeoutMs) return; // on abandonne
-      setTimeout(tick, 120);
-    };
-    tick();
-  }
-
-  function armOverlayClickUnmute(){
-    const handler = ()=>{
-      if (unmuteNow()) {
-        overlay.removeEventListener('pointerdown', handler, true);
-      }
-    };
-    // on laisse l’écouteur actif tant que nécessaire (pas de bouton)
-    overlay.addEventListener('pointerdown', handler, true);
-  }
-
-  async function openYT(url, { title='', logo='' } = {}){
+  // Ouvre le “cadre” YT mais NE crée PAS le player (attend clic)
+  function openYT(url, { title='', logo='' } = {}){
     const id = ytId(url);
     if (!id) return false;
+    pendingId = id;
 
     try { player.pause(); } catch(_){}
-    overlay.style.display = 'block';
+    overlay.style.display = 'flex';            // visible, prêt à cliquer
+    mount.innerHTML = '';                      // on videra si un ancien iframe traîne
 
-    // UI nowbar sync
+    // UI nowbar
     try {
       const n = document.getElementById('nowPlaying'); if (n) n.textContent = title || 'YouTube';
       const img = document.getElementById('channelLogo');
       if (img) { if (logo) { img.src = logo; img.classList.remove('d-none'); } else img.classList.add('d-none'); }
     } catch(_){}
 
-    await ensureYTAPI();
-
-    const playerVars = { autoplay:1, mute:1, playsinline:1, rel:0, iv_load_policy:3 };
-    if (location.protocol.startsWith('http')) playerVars.origin = location.origin;
-
-    const onReady = (e)=>{ try{ e.target.mute(); e.target.playVideo(); }catch(_){} };
-
-    if (ytPlayer) {
-      try { ytPlayer.loadVideoById({ videoId:id }); onReady({target:ytPlayer}); } catch(_){}
-    } else {
-      ytPlayer = new YT.Player(frameHost, {
-        width:'100%', height:'100%', videoId:id, playerVars,
-        events:{
-          onReady,
-          onStateChange:(e)=>{ /* si déjà PLAYING + volume > 0, rien à faire */ }
-        }
-      });
-      window.ytPlayer = ytPlayer;
-      window.YT_PLAYER_INLINE = ytPlayer;
-    }
-
-    // ——— Unmute “intelligent”
-    // 1) Si on vient d’avoir un geste (clic sur chaîne, Next/Prev...), on tente immédiatement,
-    //    sinon on ré-essaie pendant 2 s (le temps que le flux devienne jouable)
-    const since = Date.now() - lastGestureAt;
-    if (since >= 0 && since <= GESTURE_MS) {
-      tryUnmuteWithRetry(2000);
-    }
-
-    // 2) Toujours brancher un clic direct dans la zone pour unmute (fallback robuste)
-    armOverlayClickUnmute();
-
     return true;
   }
 
+  // Ferme l’overlay et stoppe le lecteur YT
   function closeYT(){
     overlay.style.display = 'none';
     try { ytPlayer && ytPlayer.stopVideo && ytPlayer.stopVideo(); } catch(_){}
   }
   window.__ytOverlayClose = closeYT;
-  window.openYT = openYT;
 
-  // ---------- Hook loadSource : YT → overlay ; sinon → Video.js
+  // Au clic utilisateur: création du lecteur + unmute + play (geste explicite ⇒ accepté partout)
+  overlay.addEventListener('pointerdown', async ()=>{
+    if (!pendingId) return;
+    await ensureYTAPI();
+
+    const vars = { autoplay:1, mute:0, playsinline:1, rel:0, iv_load_policy:3 };
+    if (location.protocol.startsWith('http')) vars.origin = location.origin;
+
+    // Détruit proprement l’ancien lecteur si besoin
+    if (ytPlayer && ytPlayer.destroy) { try{ ytPlayer.destroy(); }catch(_){ } ytPlayer = null; }
+    mount.innerHTML = '';
+
+    ytPlayer = new YT.Player(mount, {
+      width:'100%', height:'100%', videoId: pendingId, playerVars: vars,
+      events: {
+        onReady: (e)=>{ try { e.target.setVolume(100); e.target.playVideo(); } catch(_){ } },
+      }
+    });
+    window.ytPlayer = ytPlayer;
+    window.YT_PLAYER_INLINE = ytPlayer;
+  }, { passive:true });
+
+  // Hook loadSource : YT → overlay (attente clic) ; sinon → Video.js
   const _origLoadSource = window.loadSource || loadSource;
   if (typeof _origLoadSource === 'function'){
     window.loadSource = function(url, logo='', name=''){
       if (isYT(url)) { openYT(url, { title:name, logo }); return; }
+      pendingId = null;
       closeYT();
       return _origLoadSource(url, logo, name);
     };
   }
 
-  // plein écran : overlay suit .player-wrap, rien à faire
-  document.addEventListener('fullscreenchange', ()=>{ /* noop */ });
+  // plein écran : l’overlay suit .player-wrap
 })();
+
 
 
     player.on('userinactive', () => $('.player-wrap').classList.add('user-inactive'));
