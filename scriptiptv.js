@@ -340,6 +340,54 @@ btnFsPlayer?.addEventListener('click', togglePlayerFullscreen);
     // Zapping: état global
     // ————————————————
     let channels = [];
+
+    let ytGestureUnlocked = false;
+
+    // Marque l'application comme "gesture ok" (une seule fois), mémorisée pour la session
+    function markGestureUnlocked(){
+      try { ytGestureUnlocked = true; sessionStorage.setItem('ytGestureUnlocked','1'); } catch(_) { ytGestureUnlocked = true; }
+    }
+    (function initGesture(){
+      try {
+        if (sessionStorage.getItem('ytGestureUnlocked') === '1') ytGestureUnlocked = true;
+      } catch(_) {}
+      const onFirstInteract = ()=>{ markGestureUnlocked(); window.removeEventListener('pointerdown', onFirstInteract); window.removeEventListener('keydown', onFirstInteract); };
+      window.addEventListener('pointerdown', onFirstInteract, { once:true });
+      window.addEventListener('keydown', onFirstInteract, { once:true });
+    })();
+
+    // Crée un petit overlay bouton pour demander un clic utilisateur (YouTube exige un geste parfois)
+    function showYouTubeGate(onApprove){
+      try {
+        const host = document.getElementById('player')?.parentElement || document.body;
+        let gate = document.getElementById('ytGestureGate');
+        if (gate) { gate.classList.remove('d-none'); return; }
+        gate = document.createElement('div');
+        gate.id = 'ytGestureGate';
+        gate.setAttribute('style', [
+          'position:absolute','inset:0','display:flex','align-items:center','justify-content:center',
+          'background:rgba(0,0,0,0.35)','backdrop-filter:saturate(1.2) blur(1.5px)','z-index:30'
+        ].join(';'));
+        const btn = document.createElement('button');
+        btn.textContent = 'Autoriser la lecture YouTube';
+        btn.setAttribute('style', [
+          'padding:.6rem 1rem','border-radius:999px','border:1px solid rgba(255,255,255,.5)',
+          'background:rgba(33,150,243,.85)','color:#fff','font-weight:600','box-shadow:0 4px 14px rgba(0,0,0,.25)',
+          'cursor:pointer'
+        ].join(';'));
+        btn.addEventListener('click', ()=>{
+          try { markGestureUnlocked(); } catch(_) {}
+          try { host.removeChild(gate); } catch(_) { gate.classList.add('d-none'); }
+          try { onApprove && onApprove(); } catch(_) {}
+        });
+        gate.appendChild(btn);
+        // Ensure host is positioned
+        const cs = getComputedStyle(host);
+        if (cs.position === 'static') host.style.position = 'relative';
+        host.appendChild(gate);
+      } catch(e){ console.warn('YouTube gate overlay error:', e); }
+    }
+
     let autoplayPending = false;  // déclenche l'autoplay au prochain rendu de chaînes
     let filteredChannels = [];
     let currentIndex = -1;
@@ -423,7 +471,22 @@ try {
         }, 0);
       }
       const __p = player.play();
-      if (isYT) { player.one('ready', ()=>{ if (player.paused()) { try { player.play(); } catch(_){} } }); }
+      if (__p && __p.catch) {
+        __p.catch(()=>{
+          try{ player.muted(true);}catch(e){}
+          // Si YouTube et aucun geste encore, demander un clic pour déverrouiller
+          if (isYT && !ytGestureUnlocked) {
+            showYouTubeGate(()=>{
+              try { player.muted(true); } catch(_) {}
+              try { player.play(); } catch(_) {}
+            });
+            return;
+          }
+          // Sinon re-tente une fois après un court délai
+          setTimeout(()=>{ try{ player.play(); }catch(_){} }, 150);
+        });
+      }
+      if (isYT) { player.one('ready', ()=>{ if (player.paused()) { if (!ytGestureUnlocked) { showYouTubeGate(()=>{ try{ player.play(); }catch(_){} }); } else { try { player.play(); } catch(_){} } } }); }
       if (__p && __p.catch) {
         __p.catch(()=>{
           try{ player.muted(true);}catch(e){}
