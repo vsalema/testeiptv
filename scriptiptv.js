@@ -1600,3 +1600,62 @@ function closePanel(){
     try { closePanel(); } catch(_) {}
   }, true);
 })();
+
+
+
+// === M3U enhancements injection (added by GPT-5) ===
+document.addEventListener('DOMContentLoaded', () => {
+  const inputFile = document.getElementById('inputFile');
+  if (inputFile && !inputFile.__m3uEnhanced) {
+    inputFile.__m3uEnhanced = true;
+    inputFile.addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      try {
+        if (/\.m3u$/i.test(file.name)) {
+          if (typeof window.loadM3UFromFile === 'function') {
+            await window.loadM3UFromFile(e.target);
+          } else if (typeof window.parseM3UFromFile === 'function') {
+            await window.parseM3UFromFile(e.target);
+          } else {
+            // Fallback: read and try a generic parseM3U(content)
+            const text = await file.text();
+            if (typeof window.parseM3U === 'function') {
+              const chans = window.parseM3U(text);
+              if (Array.isArray(chans) && chans.length && typeof window.populateFromChannels === 'function') {
+                window.populateFromChannels(chans);
+              }
+            }
+          }
+        } else {
+          const blobUrl = URL.createObjectURL(file);
+          if (typeof window.loadSource === 'function') {
+            window.loadSource(blobUrl, '', file.name);
+          }
+        }
+      } finally {
+        e.target.value = '';
+      }
+    });
+  }
+
+  const btnPlay = document.getElementById('btnPlay');
+  const inputUrl = document.getElementById('inputUrl');
+  if (btnPlay && inputUrl && !btnPlay.__m3uEnhanced) {
+    btnPlay.__m3uEnhanced = true;
+    btnPlay.addEventListener('click', () => {
+      const url = inputUrl.value.trim();
+      if (!url) return;
+      if (/\.json(\?|#|$)/i.test(url) && window.IPTV_JSON && typeof window.IPTV_JSON.load === 'function') {
+        return window.IPTV_JSON.load(url);
+      }
+      if (/\.m3u(\?|#|$)/i.test(url) && typeof window.loadM3UFromUrl === 'function') {
+        return window.loadM3UFromUrl(url);
+      }
+      if (typeof window.loadSource === 'function') {
+        return window.loadSource(url);
+      }
+    });
+  }
+});
+// === End M3U enhancements injection ===
