@@ -606,7 +606,9 @@ updateViewportVars();
       } catch(e){ console.warn('AutoplayObserver: échec', e); }
     }
     setupAutoplayObserver();
-nnelList2'), $('#search2'));
+
+    bindCategory($('#categorySelect'), $('#categorySelect2'), $('#channelList'), $('#channelList2'), $('#search'));
+    bindCategory($('#categorySelect2'), $('#categorySelect'), $('#channelList'), $('#channelList2'), $('#search2'));
 
     // --- Offcanvas: largeur
     function syncOffcanvasWidth(){
