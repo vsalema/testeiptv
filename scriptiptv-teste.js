@@ -208,6 +208,109 @@
    techOrder: ['youtube','html5'],
    youtube: { playsinline: 1, iv_load_policy: 3, ytControls: 2 }
 });
+// === YouTube Modal Player (autonome, au-dessus de Video.js) ===
+(function(){
+  const modalEl   = document.getElementById('ytModal');
+  const dialogEl  = document.getElementById('ytModalDialog');
+  const frameWrap = document.getElementById('ytFrameWrap');
+  const iframe    = document.getElementById('ytFrame');
+
+  if (!modalEl || !dialogEl || !frameWrap || !iframe) return;
+
+  // Bootstrap modal instance
+  let bsModal = null;
+  try { bsModal = bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop:true, keyboard:true, focus:true }); } catch(_){}
+
+  // Utilitaires YouTube
+  function ytIdFromUrl(u){
+    if (!u) return '';
+    const s = String(u).trim();
+    // youtu.be/ID
+    let m = s.match(/youtu\.be\/([\w-]{6,})/i);
+    if (m) return m[1];
+    // youtube.com/watch?v=ID
+    m = s.match(/[?&]v=([\w-]{6,})/i);
+    if (m) return m[1];
+    // youtube.com/live/ID
+    m = s.match(/youtube\.com\/live\/([\w-]{6,})/i);
+    if (m) return m[1];
+    // youtube.com/shorts/ID
+    m = s.match(/youtube\.com\/shorts\/([\w-]{6,})/i);
+    if (m) return m[1];
+    return '';
+  }
+  function ytEmbedUrl(u){
+    const id = ytIdFromUrl(u);
+    if (!id) return '';
+    // Autoplay muet + inline = safe
+    return `https://www.youtube.com/embed/${id}?autoplay=1&mute=1&playsinline=1&rel=0&iv_load_policy=3`;
+  }
+  function isYouTube(u){
+    return !!u && /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i.test(String(u));
+  }
+
+  // Taille : calque exactement la zone de ton player principal (.player-wrap)
+  function syncModalSize(){
+    try{
+      const host = document.querySelector('.player-wrap') || player.el();
+      const rect = host.getBoundingClientRect();
+      dialogEl.style.margin = '0';
+      dialogEl.style.maxWidth = 'none';
+      // largeur/hauteur exactes en px (on centre le dialog)
+      dialogEl.style.width  = rect.width + 'px';
+      dialogEl.style.height = rect.height + 'px';
+      dialogEl.style.transform = `translate(${Math.max(0, (window.innerWidth - rect.width)/2)}px, ${Math.max(0, (window.innerHeight - rect.height)/2)}px)`;
+      // ratio 16:9 interne (gère iframe responsif)
+      frameWrap.classList.add('ratio');
+      frameWrap.classList.add('ratio-16x9');
+    }catch(_){}
+  }
+  window.addEventListener('resize', syncModalSize);
+
+  function openYTModal(url, { title='', logo='' } = {}){
+    const src = ytEmbedUrl(url);
+    if (!src) return false;
+    syncModalSize();
+    iframe.src = src;
+    try {
+      document.getElementById('nowPlaying') && (document.getElementById('nowPlaying').textContent = title || 'YouTube');
+      document.getElementById('channelLogo')?.classList.add('d-none');
+      if (logo) {
+        const img = document.getElementById('channelLogo');
+        if (img) { img.src = logo; img.classList.remove('d-none'); }
+      }
+    } catch(_){}
+    try { bsModal?.show(); } catch(_){}
+    return true;
+  }
+
+  function closeYTModal(){
+    try { bsModal?.hide(); } catch(_){}
+    // Stop net la vidéo
+    iframe.src = '';
+  }
+  modalEl.addEventListener('hidden.bs.modal', closeYTModal);
+
+  // Hook SANS casser ton loadSource: on détourne uniquement les liens YouTube
+  try {
+    const _origLoadSource = window.loadSource || loadSource;
+    if (typeof _origLoadSource === 'function'){
+      const hook = function(url, logo='', name=''){
+        if (isYouTube(url)){
+          // Ouvre dans le modal au lieu du player Video.js
+          openYTModal(url, { title: name, logo });
+          return;
+        }
+        // Sinon, comportement normal (HLS/MP4…)
+        return _origLoadSource(url, logo, name);
+      };
+      window.loadSource = hook; // remplace proprement
+    }
+  } catch(_){}
+
+  // Bonus : si l’autoplay de la première chaîne tombe sur YouTube,
+  // ton code appelle déjà loadSource(...) — donc ça s’ouvrira ici automatiquement.
+})();
 
     player.on('userinactive', () => $('.player-wrap').classList.add('user-inactive'));
     player.on('useractive',   () => $('.player-wrap').classList.remove('user-inactive'));
