@@ -288,6 +288,40 @@
   // Si quelqu’un referme l’overlay (au besoin, à toi d’ajouter un bouton), on revient au player standard
   window.__ytOverlayClose = closeYT;
 })();
+// === Déblocage du son YouTube au premier clic ===
+(function(){
+  const iframe = document.getElementById('ytInlineFrame');
+  if (!iframe) return;
+
+  let unmuted = false;
+
+  // écoute un clic global (une seule fois)
+  function handleFirstClick(){
+    if (unmuted) return;
+    try {
+      const src = iframe.src;
+      if (src && src.includes('youtube.com/embed/')){
+        // recharge avec mute=0 si autoplay actif
+        const newSrc = src.replace('mute=1','mute=0');
+        iframe.src = newSrc;
+        unmuted = true;
+        console.log('[YouTube Inline] unmuted on click');
+      }
+    } catch(e){ console.warn('unmute fail', e); }
+  }
+
+  // déclenche dès le premier clic utilisateur sur la page
+  window.addEventListener('pointerdown', handleFirstClick, { once:true, passive:true });
+
+  // si on change de chaîne YouTube (nouvelle URL → nouvel iframe), on réarme le flag
+  const origOpen = window.openYT;
+  if (typeof origOpen === 'function'){
+    window.openYT = function(url, meta){
+      unmuted = false;
+      return origOpen(url, meta);
+    };
+  }
+})();
 
     player.on('userinactive', () => $('.player-wrap').classList.add('user-inactive'));
     player.on('useractive',   () => $('.player-wrap').classList.remove('user-inactive'));
