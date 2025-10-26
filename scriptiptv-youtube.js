@@ -208,76 +208,75 @@
    techOrder: ['youtube','html5'],
    youtube: { playsinline: 1, iv_load_policy: 3, ytControls: 2 }
 });
-// === YouTube Inline Overlay (exactement par-dessus Video.js) ===
-/* === YouTube Inline: init 100% au clic (anti-blocage) === */
+
+/* === YouTube Inline (watch -> embed) : création au clic, son ON === */
 (function(){
   const host = document.querySelector('.player-wrap') || (player && player.el && player.el().parentElement) || document.body;
 
   // Overlay pile sur le player
   let overlay = document.getElementById('ytInlineOverlay');
   let mount   = document.getElementById('ytInlineFrame');
+  let hint    = null;
   if (!overlay) {
     overlay = document.createElement('div');
     overlay.id = 'ytInlineOverlay';
     Object.assign(overlay.style, {
-      position:'absolute', inset:'0', zIndex:'20', display:'none',
-      background:'#000', color:'#fff', display:'none', alignItems:'center', justifyContent:'center',
-      cursor:'pointer', textAlign:'center', padding:'1rem'
+      position:'absolute', inset:'0', zIndex:'20',
+      display:'none', background:'#000',
+      color:'#fff', cursor:'pointer',
+      alignItems:'center', justifyContent:'center',
+      textAlign:'center', padding:'1rem'
     });
     if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
     mount = document.createElement('div');
     mount.id = 'ytInlineFrame';
     Object.assign(mount.style, { width:'100%', height:'100%' });
-    const label = document.createElement('div');
-    label.id = 'ytTapLabel';
-    label.textContent = '▶️ Cliquer pour lancer YouTube';
-    label.style.opacity = '0.85';
+    hint = document.createElement('div');
+    hint.id = 'ytTapHint';
+    hint.textContent = '▶️ Cliquer pour lancer avec le son';
+    hint.style.opacity = '0.85';
     overlay.appendChild(mount);
-    overlay.appendChild(label);
+    overlay.appendChild(hint);
     host.appendChild(overlay);
   }
 
-  // Mini helpers
+  // Helpers
   function isYT(u){ return !!u && /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i.test(String(u)); }
-  function ytId(u){
+  function getYTId(u){
     if (!u) return '';
     const s = String(u).trim();
     let m = s.match(/youtu\.be\/([\w-]{6,})/i);        if (m) return m[1];
-    m = s.match(/[?&]v=([\w-]{6,})/i);                 if (m) return m[1];
+    m = s.match(/[?&]v=([\w-]{6,})/i);                 if (m) return m[1];      // watch?v=ID
     m = s.match(/youtube\.com\/live\/([\w-]{6,})/i);   if (m) return m[1];
     m = s.match(/youtube\.com\/shorts\/([\w-]{6,})/i); if (m) return m[1];
     return '';
   }
-
-  // Charge l’API IFrame YT
-  let ytApiReady = null;
-  function ensureYTAPI(){
-    if (ytApiReady) return ytApiReady;
-    ytApiReady = new Promise(res=>{
-      if (window.YT && window.YT.Player) return res();
-      const s = document.createElement('script');
-      s.src = 'https://www.youtube.com/iframe_api';
-      document.head.appendChild(s);
-      const prev = window.onYouTubeIframeAPIReady;
-      window.onYouTubeIframeAPIReady = function(){ try{ prev&&prev(); }catch(_){ } res(); };
+  function embedUrlFromId(id){
+    // création d’iframe AU CLIC → autoplay+son autorisés
+    const params = new URLSearchParams({
+      autoplay: '1',
+      mute: '0',
+      playsinline: '1',
+      rel: '0',
+      iv_load_policy: '3'
     });
-    return ytApiReady;
+    // origin seulement si http(s) (pas file://)
+    if (location.protocol.startsWith('http')) params.set('origin', location.origin);
+    return `https://www.youtube.com/embed/${id}?${params.toString()}`;
   }
 
-  let ytPlayer = null;
   let pendingId = null;
 
-  // Ouvre le “cadre” YT mais NE crée PAS le player (attend clic)
   function openYT(url, { title='', logo='' } = {}){
-    const id = ytId(url);
+    const id = getYTId(url);
     if (!id) return false;
     pendingId = id;
 
     try { player.pause(); } catch(_){}
-    overlay.style.display = 'flex';            // visible, prêt à cliquer
-    mount.innerHTML = '';                      // on videra si un ancien iframe traîne
+    overlay.style.display = 'flex';
+    mount.innerHTML = ''; // nettoie un ancien iframe s’il y en avait
 
-    // UI nowbar
+    // Nowbar
     try {
       const n = document.getElementById('nowPlaying'); if (n) n.textContent = title || 'YouTube';
       const img = document.getElementById('channelLogo');
@@ -287,52 +286,49 @@
     return true;
   }
 
-  // Ferme l’overlay et stoppe le lecteur YT
   function closeYT(){
     overlay.style.display = 'none';
-    try { ytPlayer && ytPlayer.stopVideo && ytPlayer.stopVideo(); } catch(_){}
+    mount.innerHTML = '';
   }
   window.__ytOverlayClose = closeYT;
+  window.openYT = openYT;
 
-  // Au clic utilisateur: création du lecteur + unmute + play (geste explicite ⇒ accepté partout)
-  overlay.addEventListener('pointerdown', async ()=>{
+  // Création de l’iframe AU CLIC (geste explicite) ⇒ son ON
+  overlay.addEventListener('pointerdown', ()=>{
     if (!pendingId) return;
-    await ensureYTAPI();
-
-    const vars = { autoplay:1, mute:0, playsinline:1, rel:0, iv_load_policy:3 };
-    if (location.protocol.startsWith('http')) vars.origin = location.origin;
-
-    // Détruit proprement l’ancien lecteur si besoin
-    if (ytPlayer && ytPlayer.destroy) { try{ ytPlayer.destroy(); }catch(_){ } ytPlayer = null; }
-    mount.innerHTML = '';
-
-    ytPlayer = new YT.Player(mount, {
-      width:'100%', height:'100%', videoId: pendingId, playerVars: vars,
-      events: {
-        onReady: (e)=>{ try { e.target.setVolume(100); e.target.playVideo(); } catch(_){ } },
-      }
-    });
-    window.ytPlayer = ytPlayer;
-    window.YT_PLAYER_INLINE = ytPlayer;
+    const src = embedUrlFromId(pendingId);
+    mount.innerHTML = '';  // reset
+    const iframe = document.createElement('iframe');
+    iframe.width = '100%';
+    iframe.height = '100%';
+    iframe.allow = 'autoplay; fullscreen; picture-in-picture';
+    iframe.referrerPolicy = 'origin-when-cross-origin';
+    iframe.src = src; // création ici = geste utilisateur => audio autorisé
+    iframe.style.border = '0';
+    mount.appendChild(iframe);
+    // après création, on n’a plus besoin du “hint”
+    if (hint) hint.style.display = 'none';
   }, { passive:true });
 
-  // Hook loadSource : YT → overlay (attente clic) ; sinon → Video.js
+  // Hook loadSource : YT (watch…) → overlay click-to-start ; sinon Video.js
   const _origLoadSource = window.loadSource || loadSource;
   if (typeof _origLoadSource === 'function'){
     window.loadSource = function(url, logo='', name=''){
-      if (isYT(url)) { openYT(url, { title:name, logo }); return; }
+      if (isYT(url)) { 
+        if (hint) hint.style.display = 'block';
+        openYT(url, { title:name, logo });
+        return;
+      }
       pendingId = null;
       closeYT();
       return _origLoadSource(url, logo, name);
     };
   }
 
-  // plein écran : l’overlay suit .player-wrap
+  // plein écran : overlay suit .player-wrap
 })();
 
-
-
-    player.on('userinactive', () => $('.player-wrap').classList.add('user-inactive'));
+   player.on('userinactive', () => $('.player-wrap').classList.add('user-inactive'));
     player.on('useractive',   () => $('.player-wrap').classList.remove('user-inactive'));
     // ==============================
     // Mini-player dock (aperçu au survol des listes)
