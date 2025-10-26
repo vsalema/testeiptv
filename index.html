@@ -44,6 +44,20 @@
 /* Modal YouTube translucide, sans contour */
 #ytModal .modal-content { background: transparent; box-shadow: none; }
 #ytModal .modal-dialog { max-width: none; }
+/* Modal YT calé sur le player, sans marge ni centrage Bootstrap */
+#ytModal .modal-dialog {
+  margin: 0 !important;        /* pas de centrage vertical */
+  max-width: none !important;
+  position: fixed;              /* on va fixer top/left en JS */
+  inset: auto auto auto auto;   /* reset */
+  transform: none !important;   /* désactive le centrage Bootstrap */
+}
+
+#ytModal .modal-content { background: transparent; box-shadow: none; border: 0; }
+
+/* Ratio interne pour l’iframe */
+#ytFrameWrap.ratio { width: 100%; height: 100%; }
+#ytFrame { width: 100%; height: 100%; display: block; border: 0; }
 
 </style>
 </link></head>
