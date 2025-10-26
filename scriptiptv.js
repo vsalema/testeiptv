@@ -41,33 +41,23 @@
     const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
 
     
-    // Normalise certaines URL YouTube vers un format 'watch?v='
+    // Normalisation basique d'URL YouTube vers un format watch?v=ID
     function normalizeYouTubeUrl(u) {
       try {
         if (!u) return u;
         let url = u.trim();
-        // Protocol
         if (url.startsWith("//")) url = "https:" + url;
-        // youtu.be short
         const mShort = url.match(/^https?:\/\/youtu\.be\/([\w-]{6,})/i);
         if (mShort) return "https://www.youtube.com/watch?v=" + mShort[1];
-        // /live/ID
         const mLive = url.match(/^https?:\/\/(?:www\.)?youtube\.com\/live\/([\w-]{6,})/i);
         if (mLive) return "https://www.youtube.com/watch?v=" + mLive[1];
-        // shorts -> watch
         const mShorts = url.match(/^https?:\/\/(?:www\.)?youtube\.com\/shorts\/([\w-]{6,})/i);
         if (mShorts) return "https://www.youtube.com/watch?v=" + mShorts[1];
         return url;
       } catch(_) { return u; }
     }
 
-    function ensureReadyPlay(fn){
-      try{
-        if (player && player.isReady_) return fn();
-        player.ready(fn);
-      }catch(e){ try{ fn(); }catch(_){ /* no-op */ } }
-    }
-function detectType(url) {
+    function detectType(url) {
       if (!url) return 'video/mp4';
       const u = url.toLowerCase();
       if (/\.m3u8(\?|$)/.test(u)) return 'application/x-mpegURL'; // HLS
@@ -391,6 +381,7 @@ btnFsPlayer?.addEventListener('click', togglePlayerFullscreen);
       if (!url) return;
       url = normalizeYouTubeUrl(url);
       const type = detectType(url);
+      const isYT = (type === 'video/youtube') || /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i.test(url);
 // — Force unmute for YouTube when user selected a channel
 try {
   const isYT = (type === 'video/youtube') || /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i.test(url);
@@ -413,30 +404,16 @@ try {
       }
 
       player.pause();
-      // Définition de la source puis lecture, en s'assurant que le player est prêt
-      ensureReadyPlay(() => {
-        player.src({ src: url, type });
-        try { if (type !== 'video/youtube') { player.muted(false); player.volume(1); } else { player.muted(true); } } catch(e) {}
-        player.poster('https://cdn.futura-sciences.com/sources/images/iptv.jpeg');
-        const tryPlay = () => {
-          const pr = player.play();
-          if (pr && pr.catch) {
-            pr.catch(()=>{
-              // second essai muet + léger délai (utile pour YouTube au premier chargement)
-              try{ player.muted(true); }catch(_){}
-              setTimeout(()=>{ try{ player.play(); }catch(_){} }, 150);
-            });
-          }
-        };
-        tryPlay();
-        // Relance sur loadedmetadata si la tech a mis du temps à s'initialiser (YT)
-        player.one('loadedmetadata', () => {
-          if (player.paused()) { try{ tryPlay(); }catch(_){ } }
-        });
-      });
+      player.src({ src: url, type });
+      try { if (isYT) { player.muted(true); } else { player.muted(false); player.volume(1); } } catch(e) {}
+      player.poster('https://cdn.futura-sciences.com/sources/images/iptv.jpeg');
       const __p = player.play();
-      if (__p && __p.catch) { __p.catch(()=>{ try{ player.muted(true);}catch(e){} }); }
-      if (__p && __p.catch) { __p.catch(()=>{ try{ player.muted(true);}catch(e){} }); }
+      if (__p && __p.catch) {
+        __p.catch(()=>{
+          try{ player.muted(true);}catch(e){}
+          setTimeout(()=>{ try{ player.play(); }catch(_){} }, 150);
+        });
+      }
 
       $('#nowPlaying').textContent = name || 'Lecture URL personnalisée';
       $('#nowUrl').textContent = prettyUrl(url);
