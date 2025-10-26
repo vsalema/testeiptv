@@ -358,13 +358,14 @@ btnFsPlayer?.addEventListener('click', togglePlayerFullscreen);
 
     // Crée un petit overlay bouton pour demander un clic utilisateur (YouTube exige un geste parfois)
     function showYouTubeGate(onApprove){
+      try { console.log('[YouTubeGate] show overlay'); } catch(_) {}
       try {
-        const host = document.getElementById('player')?.parentElement || document.body;
+        const host = document.querySelector('.player-wrap') || document.getElementById('player')?.parentElement || document.body;
         let gate = document.getElementById('ytGestureGate');
         if (gate) { gate.classList.remove('d-none'); return; }
         gate = document.createElement('div');
         gate.id = 'ytGestureGate';
-        gate.setAttribute('style', [
+        gate.setAttribute('style', ['position:fixed','inset:0','pointer-events:auto','z-index:2147483647',
           'position:absolute','inset:0','display:flex','align-items:center','justify-content:center',
           'background:rgba(0,0,0,0.35)','backdrop-filter:saturate(1.2) blur(1.5px)','z-index:30'
         ].join(';'));
@@ -376,15 +377,14 @@ btnFsPlayer?.addEventListener('click', togglePlayerFullscreen);
           'cursor:pointer'
         ].join(';'));
         btn.addEventListener('click', ()=>{
+          try { console.log('[YouTubeGate] click'); } catch(_) {}
           try { markGestureUnlocked(); } catch(_) {}
           try { host.removeChild(gate); } catch(_) { gate.classList.add('d-none'); }
           try { onApprove && onApprove(); } catch(_) {}
         });
         gate.appendChild(btn);
         // Ensure host is positioned
-        const cs = getComputedStyle(host);
-        if (cs.position === 'static') host.style.position = 'relative';
-        host.appendChild(gate);
+        document.body.appendChild(gate);
       } catch(e){ console.warn('YouTube gate overlay error:', e); }
     }
 
@@ -430,6 +430,7 @@ btnFsPlayer?.addEventListener('click', togglePlayerFullscreen);
       url = normalizeYouTubeUrl(url);
       const type = detectType(url);
       const isYT = (type === 'video/youtube') || /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i.test(url);
+      const isYT = (type === 'video/youtube') || /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i.test(url);
 // — Force unmute for YouTube when user selected a channel
 try {
   const isYT = (type === 'video/youtube') || /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i.test(url);
@@ -452,108 +453,15 @@ try {
       }
 
       player.pause();
-      player.src({ src: url, type });
+      // Définition de la source avec type explicite pour YouTube
+      if (isYT) {
+        player.src({ src: url, type: 'video/youtube' });
+      } else {
+        player.src({ src: url, type });
+      }
       try { if (isYT) { player.muted(true); } else { player.muted(false); player.volume(1); } } catch(e) {}
       player.poster('https://cdn.futura-sciences.com/sources/images/iptv.jpeg');
-      // Renfort YouTube: autorise autoplay sur l'iframe et amorce la lecture côté API
-      if (isYT) {
-        setTimeout(()=>{
-          try {
-            const iframe = player.el() && player.el().querySelector && player.el().querySelector('iframe');
-            if (iframe) iframe.setAttribute('allow', 'autoplay; fullscreen; picture-in-picture');
-          } catch(_) {}
-          try {
-            const tech = player.tech_ || (player.tech && player.tech(true));
-            const ytp = tech && (tech.ytPlayer || tech.player);
-            if (ytp && typeof ytp.mute === 'function') ytp.mute();
-            if (ytp && typeof ytp.playVideo === 'function') ytp.playVideo();
-          } catch(_) {}
-        }, 0);
-      }
-      const __p = player.play();
-      if (__p && __p.catch) {
-        __p.catch(()=>{
-          try{ player.muted(true);}catch(e){}
-          // Si YouTube et aucun geste encore, demander un clic pour déverrouiller
-          if (isYT && !ytGestureUnlocked) {
-            showYouTubeGate(()=>{
-              try { player.muted(true); } catch(_) {}
-              try { player.play(); } catch(_) {}
-            });
-            return;
-          }
-          // Sinon re-tente une fois après un court délai
-          setTimeout(()=>{ try{ player.play(); }catch(_){} }, 150);
-        });
-      }
-      if (isYT) { player.one('ready', ()=>{ if (player.paused()) { if (!ytGestureUnlocked) { showYouTubeGate(()=>{ try{ player.play(); }catch(_){} }); } else { try { player.play(); } catch(_){} } } }); }
-      if (__p && __p.catch) {
-        __p.catch(()=>{
-          try{ player.muted(true);}catch(e){}
-          setTimeout(()=>{ try{ player.play(); }catch(_){} }, 150);
-        });
-      }
-
-      $('#nowPlaying').textContent = name || 'Lecture URL personnalisée';
-      $('#nowUrl').textContent = prettyUrl(url);
-
-      const logoImg = $('#channelLogo');
-      if (logo) {
-        logoImg.src = logo;
-        logoImg.classList.remove('d-none');
-      } else {
-        logoImg.classList.add('d-none');
-      }
-
-      $('#nowbar').classList.remove('d-none');
-
-      setZapTitle(name || 'Lecture personnalisée');
-
-      const idx = filteredChannels.findIndex(c => c.url === url);
-      currentIndex = idx;
-
-      updateViewportVars();
-    }
-// Ferme le panneau offcanvas si ouvert
-function closePanel(){
-  const el = document.getElementById('panel');
-  if (!el || typeof bootstrap === 'undefined') return;
-  const oc = bootstrap.Offcanvas.getOrCreateInstance(el);
-  oc.hide();
-}
-
-    // URL + Fichier local
-    $('#btnPlay').addEventListener('click', () => {
-      const url = $('#inputUrl').value.trim();
-      if (url) loadSource(url);
-    });
-
-    $('#inputFile').addEventListener('change', (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      const url = URL.createObjectURL(file);
-      loadSource(url, '', file.name);
-    });
-
-    // ————————————————
-    // M3U parsing & UI
-    // ————————————————
-    async function parseM3U(text){
-      const out = [];
-      let current = null;
-      const lines = text.split(/\r?\n/);
-      for (const line of lines){
-        if (!line || line.startsWith('#EXTM3U')) continue;
-        if (line.startsWith('#EXTINF')){
-          const attrs = Object.fromEntries(Array.from(line.matchAll(/(\w[\w-]*)\s*=\s*"([^"]*)"/g)).map(m=>[m[1], m[2]]));
-          const name = (line.split(',')[1] || attrs['tvg-name'] || 'Sans nom').trim();
-          current = { name, group: attrs['group-title'] || 'Divers', logo: attrs['tvg-logo'] || '' };
-        } else if (current && !line.startsWith('#')){
-          current.url = line.trim();
-          out.push(current);
-          current = null;
-        }
-      }
+      if (isYT && !ytGestureUnlocked) { try { showYouTubeGate(()=>{ try{ player.play(); }catch(_){} }); } catch(_) {} }
       return out;
     }
 
@@ -655,6 +563,7 @@ for (const container of [container1, container2]){
 
     function bindLoadButtons(btn, sel, customInput){
       btn.addEventListener('click', ()=>{
+          try { console.log('[YouTubeGate] click'); } catch(_) {}
         const val = sel.value === 'custom' ? customInput.value.trim() : sel.value;
         if (val) { autoplayPending = true; currentIndex = -1; loadM3UFromUrl(val); }
       });
