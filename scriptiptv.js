@@ -208,111 +208,110 @@
    techOrder: ['youtube','html5'],
    youtube: { playsinline: 1, iv_load_policy: 3, ytControls: 2 }
 });
+// === YouTube Modal Player (autonome, au-dessus de Video.js) ===
 (function(){
   const modalEl   = document.getElementById('ytModal');
   const dialogEl  = document.getElementById('ytModalDialog');
   const frameWrap = document.getElementById('ytFrameWrap');
   const iframe    = document.getElementById('ytFrame');
+
   if (!modalEl || !dialogEl || !frameWrap || !iframe) return;
 
+  // Bootstrap modal instance
   let bsModal = null;
-  try { bsModal = bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: true, keyboard: true, focus: true }); } catch(_){}
+  try { bsModal = bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop:true, keyboard:true, focus:true }); } catch(_){}
 
-  // Trouve le conteneur visible du player (priorité .player-wrap sinon le <div> video.js)
-  function getPlayerHost(){
-    return document.querySelector('.player-wrap') || (window.player && player.el && player.el()) || document.getElementById('player');
-  }
-
-  // Calage exact du modal sur le player (viewport coords)
-  function syncModalToPlayer(){
-    try{
-      const host = getPlayerHost();
-      if (!host) return;
-
-      const r = host.getBoundingClientRect(); // coordonnées viewport
-      // Positionne la boîte du modal exactement au même endroit
-      dialogEl.style.position = 'fixed';
-      dialogEl.style.left     = `${Math.round(r.left)}px`;
-      dialogEl.style.top      = `${Math.round(r.top)}px`;
-      dialogEl.style.width    = `${Math.round(r.width)}px`;
-      dialogEl.style.height   = `${Math.round(r.height)}px`;
-      dialogEl.style.transform = 'none';
-
-      // L’iframe occupe toute la boîte
-      frameWrap.classList.add('ratio');
-      frameWrap.classList.add('ratio-16x9');
-      frameWrap.style.width  = '100%';
-      frameWrap.style.height = '100%';
-    }catch(_){}
-  }
-
-  // Recalage sur événements d’affichage et de layout
-  modalEl.addEventListener('shown.bs.modal', syncModalToPlayer);
-  window.addEventListener('resize',  syncModalToPlayer, { passive: true });
-  window.addEventListener('scroll',  syncModalToPlayer, { passive: true });
-  // Si tu as des transitions de layout, un petit rafraîchissement tardif aide :
-  modalEl.addEventListener('shown.bs.modal', () => setTimeout(syncModalToPlayer, 50));
-
-  // Fullscreen : si le player passe en plein écran, on colle le modal à 100% viewport
-  document.addEventListener('fullscreenchange', ()=>{
-    if (!document.fullscreenElement) return syncModalToPlayer();
-    const host = getPlayerHost();
-    if (document.fullscreenElement === host || document.fullscreenElement === host?.querySelector('video') || document.fullscreenElement === player?.el()){
-      dialogEl.style.left = '0px';
-      dialogEl.style.top  = '0px';
-      dialogEl.style.width  = '100vw';
-      dialogEl.style.height = '100vh';
-      dialogEl.style.transform = 'none';
-    }
-  });
-
-  // Le reste : openYTModal / closeYTModal ne changent pas, on veille juste à appeler syncModalToPlayer() avant show()
+  // Utilitaires YouTube
   function ytIdFromUrl(u){
     if (!u) return '';
     const s = String(u).trim();
-    let m = s.match(/youtu\.be\/([\w-]{6,})/i);       if (m) return m[1];
-    m = s.match(/[?&]v=([\w-]{6,})/i);                if (m) return m[1];
-    m = s.match(/youtube\.com\/live\/([\w-]{6,})/i);  if (m) return m[1];
-    m = s.match(/youtube\.com\/shorts\/([\w-]{6,})/i);if (m) return m[1];
+    // youtu.be/ID
+    let m = s.match(/youtu\.be\/([\w-]{6,})/i);
+    if (m) return m[1];
+    // youtube.com/watch?v=ID
+    m = s.match(/[?&]v=([\w-]{6,})/i);
+    if (m) return m[1];
+    // youtube.com/live/ID
+    m = s.match(/youtube\.com\/live\/([\w-]{6,})/i);
+    if (m) return m[1];
+    // youtube.com/shorts/ID
+    m = s.match(/youtube\.com\/shorts\/([\w-]{6,})/i);
+    if (m) return m[1];
     return '';
   }
   function ytEmbedUrl(u){
     const id = ytIdFromUrl(u);
-    return id ? `https://www.youtube.com/embed/${id}?autoplay=1&mute=1&playsinline=1&rel=0&iv_load_policy=3` : '';
+    if (!id) return '';
+    // Autoplay muet + inline = safe
+    return `https://www.youtube.com/embed/${id}?autoplay=1&mute=1&playsinline=1&rel=0&iv_load_policy=3`;
   }
-  function isYouTube(u){ return !!u && /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i.test(String(u)); }
+  function isYouTube(u){
+    return !!u && /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i.test(String(u));
+  }
+
+  // Taille : calque exactement la zone de ton player principal (.player-wrap)
+  function syncModalSize(){
+    try{
+      const host = document.querySelector('.player-wrap') || player.el();
+      const rect = host.getBoundingClientRect();
+      dialogEl.style.margin = '0';
+      dialogEl.style.maxWidth = 'none';
+      // largeur/hauteur exactes en px (on centre le dialog)
+      dialogEl.style.width  = rect.width + 'px';
+      dialogEl.style.height = rect.height + 'px';
+      dialogEl.style.transform = `translate(${Math.max(0, (window.innerWidth - rect.width)/2)}px, ${Math.max(0, (window.innerHeight - rect.height)/2)}px)`;
+      // ratio 16:9 interne (gère iframe responsif)
+      frameWrap.classList.add('ratio');
+      frameWrap.classList.add('ratio-16x9');
+    }catch(_){}
+  }
+  window.addEventListener('resize', syncModalSize);
 
   function openYTModal(url, { title='', logo='' } = {}){
     const src = ytEmbedUrl(url);
     if (!src) return false;
-    syncModalToPlayer();                 // <— calage juste avant affichage
+    syncModalSize();
     iframe.src = src;
     try {
       document.getElementById('nowPlaying') && (document.getElementById('nowPlaying').textContent = title || 'YouTube');
-      const logoImg = document.getElementById('channelLogo');
-      if (logoImg) {
-        if (logo) { logoImg.src = logo; logoImg.classList.remove('d-none'); }
-        else logoImg.classList.add('d-none');
+      document.getElementById('channelLogo')?.classList.add('d-none');
+      if (logo) {
+        const img = document.getElementById('channelLogo');
+        if (img) { img.src = logo; img.classList.remove('d-none'); }
       }
     } catch(_){}
     try { bsModal?.show(); } catch(_){}
     return true;
   }
 
-  function closeYTModal(){ try { bsModal?.hide(); } catch(_){} iframe.src = ''; }
+  function closeYTModal(){
+    try { bsModal?.hide(); } catch(_){}
+    // Stop net la vidéo
+    iframe.src = '';
+  }
   modalEl.addEventListener('hidden.bs.modal', closeYTModal);
 
-  // Hook non-invasif : YouTube dans le modal, le reste dans Video.js
+  // Hook SANS casser ton loadSource: on détourne uniquement les liens YouTube
   try {
     const _origLoadSource = window.loadSource || loadSource;
     if (typeof _origLoadSource === 'function'){
-      window.loadSource = function(url, logo='', name=''){
-        if (isYouTube(url)) { openYTModal(url, { title: name, logo }); return; }
+      const hook = function(url, logo='', name=''){
+        if (isYouTube(url)){
+          // Ouvre dans le modal au lieu du player Video.js
+          openYTModal(url, { title: name, logo });
+          return;
+        }
+        // Sinon, comportement normal (HLS/MP4…)
         return _origLoadSource(url, logo, name);
       };
+      window.loadSource = hook; // remplace proprement
     }
   } catch(_){}
+
+  // Bonus : si l’autoplay de la première chaîne tombe sur YouTube,
+  // ton code appelle déjà loadSource(...) — donc ça s’ouvrira ici automatiquement.
 })();
+
 
 
     player.on('userinactive', () => $('.player-wrap').classList.add('user-inactive'));
