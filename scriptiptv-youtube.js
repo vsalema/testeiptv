@@ -209,178 +209,167 @@
    youtube: { playsinline: 1, iv_load_policy: 3, ytControls: 2 }
 });
 // === YouTube Inline Overlay (exactement par-dessus Video.js) ===
+/* === YouTube Inline Overlay (API officielle, unmute auto sans bouton) === */
 (function(){
   const host = document.querySelector('.player-wrap') || (player && player.el && player.el().parentElement) || document.body;
 
-  // Crée l’overlay si absent
+  // ---------- Overlay exactement sur le player
   let overlay = document.getElementById('ytInlineOverlay');
-  let iframe  = document.getElementById('ytInlineFrame');
+  let frameHost = document.getElementById('ytInlineFrame');
   if (!overlay) {
     overlay = document.createElement('div');
     overlay.id = 'ytInlineOverlay';
-    overlay.setAttribute('aria-hidden', 'true');
-    iframe = document.createElement('iframe');
-    iframe.id = 'ytInlineFrame';
-    iframe.title = 'YouTube';
-    iframe.allow = 'autoplay; fullscreen; picture-in-picture';
-    iframe.referrerPolicy = 'origin-when-cross-origin';
-    overlay.appendChild(iframe);
+    overlay.setAttribute('aria-hidden','true');
+    Object.assign(overlay.style, {
+      position:'absolute', inset:'0', zIndex:'20', display:'none', background:'#000'
+    });
+    frameHost = document.createElement('div');
+    frameHost.id = 'ytInlineFrame';
+    Object.assign(frameHost.style, { width:'100%', height:'100%' });
+    if (host && getComputedStyle(host).position === 'static') host.style.position = 'relative';
+    overlay.appendChild(frameHost);
     host.appendChild(overlay);
   }
 
-  // Détection & normalisation
+  // ---------- Helpers YouTube
   function isYT(u){ return !!u && /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i.test(String(u)); }
   function ytId(u){
     if (!u) return '';
     const s = String(u).trim();
-    let m = s.match(/youtu\.be\/([\w-]{6,})/i);       if (m) return m[1];
-    m = s.match(/[?&]v=([\w-]{6,})/i);                if (m) return m[1];
-    m = s.match(/youtube\.com\/live\/([\w-]{6,})/i);  if (m) return m[1];
-    m = s.match(/youtube\.com\/shorts\/([\w-]{6,})/i);if (m) return m[1];
+    let m = s.match(/youtu\.be\/([\w-]{6,})/i);        if (m) return m[1];
+    m = s.match(/[?&]v=([\w-]{6,})/i);                 if (m) return m[1];
+    m = s.match(/youtube\.com\/live\/([\w-]{6,})/i);   if (m) return m[1];
+    m = s.match(/youtube\.com\/shorts\/([\w-]{6,})/i); if (m) return m[1];
     return '';
   }
-  function ytEmbed(u){
-  const id = ytId(u);
-  if (!id) return '';
-  const origin = encodeURIComponent(location.origin || 'https://localhost');
-  // autoplay muet (safe), JS API activée, playsinline
-  return `https://www.youtube.com/embed/${id}?autoplay=1&mute=1&playsinline=1&rel=0&iv_load_policy=3&enablejsapi=1&origin=${origin}`;
-}
 
+  // ---------- Charge l’API IFrame YouTube une seule fois
+  let ytApiReady = null;
+  function ensureYTAPI(){
+    if (ytApiReady) return ytApiReady;
+    ytApiReady = new Promise((resolve)=>{
+      if (window.YT && window.YT.Player) return resolve();
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      document.head.appendChild(tag);
+      const prev = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = function(){
+        try { prev && prev(); } catch(_){}
+        resolve();
+      };
+    });
+    return ytApiReady;
+  }
 
-  // Ouvrir/fermer l’overlay
-  function openYT(url, { title='', logo='' } = {}){
-    const src = ytEmbed(url);
-    if (!src) return false;
+  // ---------- Fenêtre de geste utilisateur (2 s)
+  const GESTURE_MS = 2000;
+  let lastGestureAt = 0;
+  window.addEventListener('pointerdown', () => { lastGestureAt = Date.now(); }, true);
+
+  // ---------- Player instance
+  let ytPlayer = null;
+  window.ytPlayer = ytPlayer;
+
+  function unmuteNow(){
+    try {
+      if (!ytPlayer) return false;
+      ytPlayer.unMute && ytPlayer.unMute();
+      ytPlayer.setVolume && ytPlayer.setVolume(100);
+      ytPlayer.playVideo && ytPlayer.playVideo();
+      return true;
+    } catch { return false; }
+  }
+
+  function tryUnmuteWithRetry(timeoutMs=2000){
+    const t0 = Date.now();
+    const tick = () => {
+      if (unmuteNow()) return; // réussi
+      if (Date.now()-t0 >= timeoutMs) return; // on abandonne
+      setTimeout(tick, 120);
+    };
+    tick();
+  }
+
+  function armOverlayClickUnmute(){
+    const handler = ()=>{
+      if (unmuteNow()) {
+        overlay.removeEventListener('pointerdown', handler, true);
+      }
+    };
+    // on laisse l’écouteur actif tant que nécessaire (pas de bouton)
+    overlay.addEventListener('pointerdown', handler, true);
+  }
+
+  async function openYT(url, { title='', logo='' } = {}){
+    const id = ytId(url);
+    if (!id) return false;
+
     try { player.pause(); } catch(_){}
-    // place l’overlay au-dessus
-    overlay.classList.add('active');
-    // met à jour l’UI courante (titre/logo)
+    overlay.style.display = 'block';
+
+    // UI nowbar sync
     try {
       const n = document.getElementById('nowPlaying'); if (n) n.textContent = title || 'YouTube';
       const img = document.getElementById('channelLogo');
-      if (img) {
-        if (logo) { img.src = logo; img.classList.remove('d-none'); }
-        else img.classList.add('d-none');
-      }
+      if (img) { if (logo) { img.src = logo; img.classList.remove('d-none'); } else img.classList.add('d-none'); }
     } catch(_){}
-    // lance la lecture dans l’iframe (autoplay muted → passe partout)
-    iframe.src = src;
+
+    await ensureYTAPI();
+
+    const playerVars = { autoplay:1, mute:1, playsinline:1, rel:0, iv_load_policy:3 };
+    if (location.protocol.startsWith('http')) playerVars.origin = location.origin;
+
+    const onReady = (e)=>{ try{ e.target.mute(); e.target.playVideo(); }catch(_){} };
+
+    if (ytPlayer) {
+      try { ytPlayer.loadVideoById({ videoId:id }); onReady({target:ytPlayer}); } catch(_){}
+    } else {
+      ytPlayer = new YT.Player(frameHost, {
+        width:'100%', height:'100%', videoId:id, playerVars,
+        events:{
+          onReady,
+          onStateChange:(e)=>{ /* si déjà PLAYING + volume > 0, rien à faire */ }
+        }
+      });
+      window.ytPlayer = ytPlayer;
+      window.YT_PLAYER_INLINE = ytPlayer;
+    }
+
+    // ——— Unmute “intelligent”
+    // 1) Si on vient d’avoir un geste (clic sur chaîne, Next/Prev...), on tente immédiatement,
+    //    sinon on ré-essaie pendant 2 s (le temps que le flux devienne jouable)
+    const since = Date.now() - lastGestureAt;
+    if (since >= 0 && since <= GESTURE_MS) {
+      tryUnmuteWithRetry(2000);
+    }
+
+    // 2) Toujours brancher un clic direct dans la zone pour unmute (fallback robuste)
+    armOverlayClickUnmute();
+
     return true;
   }
+
   function closeYT(){
-    overlay.classList.remove('active');
-    // stop net la vidéo
-    iframe.src = '';
+    overlay.style.display = 'none';
+    try { ytPlayer && ytPlayer.stopVideo && ytPlayer.stopVideo(); } catch(_){}
   }
+  window.__ytOverlayClose = closeYT;
+  window.openYT = openYT;
 
-  // Si Video.js passe en fullscreen, l’overlay suit automatiquement (absolute/inset:0 dans .player-wrap)
-  // Rien à faire de plus. On nettoie juste à la sortie si besoin :
-  document.addEventListener('fullscreenchange', ()=>{/* noop: overlay suit le conteneur */});
-
-  // Hook loadSource SANS rien casser : YouTube => overlay ; sinon => Video.js
+  // ---------- Hook loadSource : YT → overlay ; sinon → Video.js
   const _origLoadSource = window.loadSource || loadSource;
   if (typeof _origLoadSource === 'function'){
     window.loadSource = function(url, logo='', name=''){
-      if (isYT(url)) { openYT(url, { title: name, logo }); return; }
-      // Si on quitte YouTube, on ferme l’overlay et on laisse Video.js jouer
+      if (isYT(url)) { openYT(url, { title:name, logo }); return; }
       closeYT();
       return _origLoadSource(url, logo, name);
     };
   }
 
-  // Si quelqu’un referme l’overlay (au besoin, à toi d’ajouter un bouton), on revient au player standard
-  window.__ytOverlayClose = closeYT;
-})();
-// === Unmute YouTube sur clic (via Iframe API, sans recharger la vidéo) ===
-(function(){
-  const overlay = document.getElementById('ytInlineOverlay');
-  const iframe  = document.getElementById('ytInlineFrame');
-  if (!overlay || !iframe) return;
-
-  // Envoie une commande Iframe API YouTube
-  function ytCmd(func, args=[]){
-    try {
-      iframe.contentWindow?.postMessage(JSON.stringify({
-        event: 'command',
-        func,
-        args
-      }), '*');
-    } catch(_) {}
-  }
-
-  // Arme l’unmute pour la prochaine vidéo YouTube ouverte
-  function armUnmuteOnce(){
-    // Un seul clic nécessaire
-    const onClick = () => {
-      // lever le mute + mettre le volume + s’assurer que ça joue
-      ytCmd('unMute');
-      ytCmd('setVolume', [100]);
-      ytCmd('playVideo');
-      overlay.removeEventListener('pointerdown', onClick, true);
-    };
-    overlay.addEventListener('pointerdown', onClick, true);
-  }
-
-  // Réarmer l’unmute à chaque openYT (on hook proprement sans casser ta fonction)
-  const _openYT = window.openYT;
-  if (typeof _openYT === 'function'){
-    window.openYT = function(url, meta){
-      const ok = _openYT(url, meta);
-      if (ok) {
-        // s’assure que l’URL d’embed contient bien enablejsapi & origin (au cas où)
-        try {
-          if (iframe.src && !/enablejsapi=1/.test(iframe.src)) {
-            const u = new URL(iframe.src);
-            u.searchParams.set('enablejsapi','1');
-            u.searchParams.set('origin', location.origin || 'https://localhost');
-            iframe.src = u.toString();
-          }
-        } catch(_) {}
-        // arme l’unmute pour le premier clic utilisateur
-        armUnmuteOnce();
-      }
-      return ok;
-    };
-  }
+  // plein écran : overlay suit .player-wrap, rien à faire
+  document.addEventListener('fullscreenchange', ()=>{ /* noop */ });
 })();
 
-
-
-// === Déblocage du son YouTube au premier clic ===
-(function(){
-  const iframe = document.getElementById('ytInlineFrame');
-  if (!iframe) return;
-
-  let unmuted = false;
-
-  // écoute un clic global (une seule fois)
-  function handleFirstClick(){
-    if (unmuted) return;
-    try {
-      const src = iframe.src;
-      if (src && src.includes('youtube.com/embed/')){
-        // recharge avec mute=0 si autoplay actif
-        const newSrc = src.replace('mute=1','mute=0');
-        iframe.src = newSrc;
-        unmuted = true;
-        console.log('[YouTube Inline] unmuted on click');
-      }
-    } catch(e){ console.warn('unmute fail', e); }
-  }
-
-  // déclenche dès le premier clic utilisateur sur la page
-  window.addEventListener('pointerdown', handleFirstClick, { once:true, passive:true });
-
-  // si on change de chaîne YouTube (nouvelle URL → nouvel iframe), on réarme le flag
-  const origOpen = window.openYT;
-  if (typeof origOpen === 'function'){
-    window.openYT = function(url, meta){
-      unmuted = false;
-      return origOpen(url, meta);
-    };
-  }
-})();
 
     player.on('userinactive', () => $('.player-wrap').classList.add('user-inactive'));
     player.on('useractive',   () => $('.player-wrap').classList.remove('user-inactive'));
