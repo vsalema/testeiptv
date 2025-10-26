@@ -377,6 +377,25 @@
   document.addEventListener('fullscreenchange', ()=>{ /* noop */ });
 })();
 
+// — Coupe-circuit mute global autour de l’overlay YouTube —
+window.__MUTE_LOCK = true; // ton mute global peut lire ce flag
+
+(function(){
+  const _open = window.openYT, _close = window.__ytOverlayClose || (()=>{});
+  if (typeof _open === 'function'){
+    window.openYT = function(url, meta){
+      // on force le son côté app pendant YouTube
+      window.__MUTE_LOCK = false;
+      try { player.muted(false); player.volume(1); } catch(_){}
+      return _open(url, meta);
+    };
+  }
+  window.__ytOverlayClose = function(){
+    try { _close(); } catch(_){}
+    // on rend la main au mute global dès qu’on quitte YouTube
+    window.__MUTE_LOCK = true;
+  };
+})();
 
 
 
