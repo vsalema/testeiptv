@@ -244,7 +244,7 @@
   if (!id) return '';
   const origin = encodeURIComponent(location.origin || 'https://localhost');
   // autoplay muet (safe), JS API activée, playsinline
-  return `https://www.youtube.com/embed/${id}?autoplay=1&mute=1&playsinline=1&rel=0&iv_load_policy=3&enablejsapi=1&origin=${origin}`;
+  return `https://www.youtube.com/embed/${id}?autoplay=1&mute=0&playsinline=1&rel=0&iv_load_policy=3&enablejsapi=1&origin=${origin}`;
 }
 
 
