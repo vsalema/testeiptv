@@ -41,6 +41,10 @@
     height: var(--nb-logo-size) !important;
     object-fit: contain;
   }
+/* Modal YouTube translucide, sans contour */
+#ytModal .modal-content { background: transparent; box-shadow: none; }
+#ytModal .modal-dialog { max-width: none; }
+
 </style>
 </link></head>
 <body>
@@ -321,5 +325,22 @@ if (selJson) {
 }
 
 </script>
+<!-- YouTube Modal (autonome) -->
+<div class="modal fade" id="ytModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" id="ytModalDialog">
+    <div class="modal-content bg-transparent border-0 shadow-none">
+      <div class="ratio ratio-16x9" id="ytFrameWrap">
+        <iframe id="ytFrame"
+                src=""
+                title="YouTube"
+                allow="autoplay; fullscreen; picture-in-picture"
+                allowfullscreen
+                referrerpolicy="origin-when-cross-origin"
+                style="border:0;"></iframe>
+      </div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
