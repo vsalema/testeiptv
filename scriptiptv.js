@@ -296,7 +296,7 @@
 
     const playerVars = {
       autoplay: 1,
-      mute: 1,            // ← démarre muet (autoplay-friendly)
+      mute: 0,            // ← démarre muet (autoplay-friendly)
       playsinline: 1,
       rel: 0,
       iv_load_policy: 3,
