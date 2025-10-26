@@ -323,27 +323,9 @@ btnFsPlayer?.addEventListener('click', togglePlayerFullscreen);
     // Zapping: état global
     // ————————————————
     let channels = [];
+    let autoplayPending = false;  // déclenche l'autoplay au prochain rendu de chaînes
     let filteredChannels = [];
     let currentIndex = -1;
-    // --- Autoplay: lire automatiquement la première chaîne après chargement de playlist
-    function autoplayFirst(){
-      try {
-        setTimeout(() => {
-          if (Array.isArray(filteredChannels) && filteredChannels.length > 0){
-            const first = filteredChannels[0];
-            currentIndex = 0;
-            if (first && first.url){
-              console.log('[Autoplay] Lecture de la première chaîne:', first.name || first.url);
-              loadSource(first.url, first.logo || '', first.name || 'Chaîne');
-            }
-          } else if (typeof document !== 'undefined') {
-            const firstItem = document.querySelector('#channelList .list-group-item, #channelList2 .list-group-item');
-            if (firstItem) firstItem.click();
-          }
-        }, 0);
-      } catch(e){ console.warn('Autoplay: échec', e); }
-    }
-
 
     const btnPrev = $('#btnPrev');
     const btnNext = $('#btnNext');
@@ -506,7 +488,18 @@ function closePanel(){
         if (!cur) currentIndex = -1;
       }
 
-      for (const container of [container1, container2]){
+      
+      // Déclenche l'autoplay une seule fois juste après premier rendu
+      if (autoplayPending && currentIndex === -1 && filteredChannels.length > 0){
+        autoplayPending = false;
+        currentIndex = 0;
+        const first = filteredChannels[0];
+        try {
+          console.log('[Autoplay/renderChannels] Lecture de la première chaîne:', first.name || first.url);
+          loadSource(first.url, first.logo || '', first.name || 'Chaîne');
+        } catch(e){ console.warn('Autoplay via renderChannels a échoué:', e); }
+      }
+for (const container of [container1, container2]){
         if (!container) continue;
         container.onclick = (e) => {
           const btn = e.target.closest('button[data-url]');
@@ -529,9 +522,7 @@ function closePanel(){
         channels = await parseM3U(txt);
         renderCategories(channels, $('#categorySelect'), $('#categorySelect2'));
         renderChannels(channels, $('#channelList'), $('#channelList2'));
-        
-        autoplayFirst();
-updateViewportVars();
+        updateViewportVars();
       } catch (err){
         console.error(err);
         alert('Impossible de charger la playlist. Certaines sources bloquent le CORS. Essayez de la télécharger et d\'utiliser le bouton "Choisir un fichier".');
@@ -545,9 +536,7 @@ updateViewportVars();
       channels = await parseM3U(txt);
       renderCategories(channels, $('#categorySelect'), $('#categorySelect2'));
       renderChannels(channels, $('#channelList'), $('#channelList2'));
-      
-        autoplayFirst();
-updateViewportVars();
+      updateViewportVars();
     }
 
     function bindSourceSelectors(sel, customWrap){
@@ -583,29 +572,6 @@ updateViewportVars();
       searchInput.addEventListener('input', handler);
       select.addEventListener('change', ()=>{ if (selectTwin) selectTwin.value = select.value; });
     }
-
-    bindCategory($('#categorySelect'), $('#categorySelect2'), $('#channelList'), $('#channelList2'), $('#search'));
-    bindCategory($('#categorySelect2'), $('#categorySelect'), $('#channelList'), $('#cha
-    // --- Autoplay fallback: déclenche quand la liste s'affiche (utile pour les playlists JSON)
-    function setupAutoplayObserver(){
-      try {
-        const targets = [document.getElementById('channelList'), document.getElementById('channelList2')].filter(Boolean);
-        if (!targets.length) return;
-        const once = { done:false };
-        const cb = () => {
-          if (once.done) return;
-          if (currentIndex === -1 && ((targets[0] && targets[0].querySelector('.list-group-item')) || (targets[1] && targets[1].querySelector('.list-group-item')))){
-            once.done = true;
-            autoplayFirst();
-          }
-        };
-        const mo = new MutationObserver(cb);
-        targets.forEach(t => mo.observe(t, {childList:true}));
-        // Si déjà rempli, tente immédiatement
-        setTimeout(cb, 0);
-      } catch(e){ console.warn('AutoplayObserver: échec', e); }
-    }
-    setupAutoplayObserver();
 
     bindCategory($('#categorySelect'), $('#categorySelect2'), $('#channelList'), $('#channelList2'), $('#search'));
     bindCategory($('#categorySelect2'), $('#categorySelect'), $('#channelList'), $('#channelList2'), $('#search2'));
@@ -1705,3 +1671,35 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 // === End M3U enhancements injection ===
+
+
+
+// === Autoplay Fallback (JSON & cas asynchrones) ===
+(function(){
+  try {
+    document.addEventListener('DOMContentLoaded', function(){
+      const targets = [document.getElementById('channelList'), document.getElementById('channelList2')].filter(Boolean);
+      if (!targets.length) return;
+      let done = false;
+      const trigger = () => {
+        if (done) return;
+        const hasItem = targets.some(t => t && t.querySelector && t.querySelector('.list-group-item'));
+        if (hasItem && (typeof currentIndex === 'number') && currentIndex === -1) {
+          done = true;
+          if (typeof autoplayPending === 'undefined') window.autoplayPending = true;
+          autoplayPending = true;
+          try { 
+            const firstBtn = document.querySelector('#channelList .list-group-item, #channelList2 .list-group-item');
+            if (firstBtn) firstBtn.click();
+          } catch(e){ console.warn('Autoplay fallback JSON a échoué:', e); }
+        }
+      };
+      const mo = new MutationObserver(trigger);
+      targets.forEach(t => mo.observe(t, {childList:true}));
+      // Essai instantané si déjà rempli
+      setTimeout(trigger, 0);
+      // Sécurité: re-tente après un court délai (chargements lents)
+      setTimeout(trigger, 500);
+    });
+  } catch(e){ console.warn('Autoplay fallback init error:', e); }
+})();
