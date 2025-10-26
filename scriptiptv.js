@@ -407,7 +407,23 @@ try {
       player.src({ src: url, type });
       try { if (isYT) { player.muted(true); } else { player.muted(false); player.volume(1); } } catch(e) {}
       player.poster('https://cdn.futura-sciences.com/sources/images/iptv.jpeg');
+      // Renfort YouTube: autorise autoplay sur l'iframe et amorce la lecture côté API
+      if (isYT) {
+        setTimeout(()=>{
+          try {
+            const iframe = player.el() && player.el().querySelector && player.el().querySelector('iframe');
+            if (iframe) iframe.setAttribute('allow', 'autoplay; fullscreen; picture-in-picture');
+          } catch(_) {}
+          try {
+            const tech = player.tech_ || (player.tech && player.tech(true));
+            const ytp = tech && (tech.ytPlayer || tech.player);
+            if (ytp && typeof ytp.mute === 'function') ytp.mute();
+            if (ytp && typeof ytp.playVideo === 'function') ytp.playVideo();
+          } catch(_) {}
+        }, 0);
+      }
       const __p = player.play();
+      if (isYT) { player.one('ready', ()=>{ if (player.paused()) { try { player.play(); } catch(_){} } }); }
       if (__p && __p.catch) {
         __p.catch(()=>{
           try{ player.muted(true);}catch(e){}
