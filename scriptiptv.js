@@ -328,7 +328,6 @@ btnFsPlayer?.addEventListener('click', togglePlayerFullscreen);
     // --- Autoplay: lire automatiquement la première chaîne après chargement de playlist
     function autoplayFirst(){
       try {
-        // Attendre la fin du rendu pour être sûr que filteredChannels est à jour
         setTimeout(() => {
           if (Array.isArray(filteredChannels) && filteredChannels.length > 0){
             const first = filteredChannels[0];
@@ -338,7 +337,6 @@ btnFsPlayer?.addEventListener('click', togglePlayerFullscreen);
               loadSource(first.url, first.logo || '', first.name || 'Chaîne');
             }
           } else if (typeof document !== 'undefined') {
-            // Fallback DOM: simule un clic sur le premier élément de la liste
             const firstItem = document.querySelector('#channelList .list-group-item, #channelList2 .list-group-item');
             if (firstItem) firstItem.click();
           }
@@ -531,7 +529,9 @@ function closePanel(){
         channels = await parseM3U(txt);
         renderCategories(channels, $('#categorySelect'), $('#categorySelect2'));
         renderChannels(channels, $('#channelList'), $('#channelList2'));
-        updateViewportVars();
+        
+        autoplayFirst();
+updateViewportVars();
       } catch (err){
         console.error(err);
         alert('Impossible de charger la playlist. Certaines sources bloquent le CORS. Essayez de la télécharger et d\'utiliser le bouton "Choisir un fichier".');
@@ -545,7 +545,9 @@ function closePanel(){
       channels = await parseM3U(txt);
       renderCategories(channels, $('#categorySelect'), $('#categorySelect2'));
       renderChannels(channels, $('#channelList'), $('#channelList2'));
-      updateViewportVars();
+      
+        autoplayFirst();
+updateViewportVars();
     }
 
     function bindSourceSelectors(sel, customWrap){
@@ -583,7 +585,28 @@ function closePanel(){
     }
 
     bindCategory($('#categorySelect'), $('#categorySelect2'), $('#channelList'), $('#channelList2'), $('#search'));
-    bindCategory($('#categorySelect2'), $('#categorySelect'), $('#channelList'), $('#channelList2'), $('#search2'));
+    bindCategory($('#categorySelect2'), $('#categorySelect'), $('#channelList'), $('#cha
+    // --- Autoplay fallback: déclenche quand la liste s'affiche (utile pour les playlists JSON)
+    function setupAutoplayObserver(){
+      try {
+        const targets = [document.getElementById('channelList'), document.getElementById('channelList2')].filter(Boolean);
+        if (!targets.length) return;
+        const once = { done:false };
+        const cb = () => {
+          if (once.done) return;
+          if (currentIndex === -1 && ((targets[0] && targets[0].querySelector('.list-group-item')) || (targets[1] && targets[1].querySelector('.list-group-item')))){
+            once.done = true;
+            autoplayFirst();
+          }
+        };
+        const mo = new MutationObserver(cb);
+        targets.forEach(t => mo.observe(t, {childList:true}));
+        // Si déjà rempli, tente immédiatement
+        setTimeout(cb, 0);
+      } catch(e){ console.warn('AutoplayObserver: échec', e); }
+    }
+    setupAutoplayObserver();
+nnelList2'), $('#search2'));
 
     // --- Offcanvas: largeur
     function syncOffcanvasWidth(){
