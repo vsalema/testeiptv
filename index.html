@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+
+<html lang="fr">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>STREAMBOX IPTV LIVE</title>
+<meta content="no-cache, no-store, must-revalidate" http-equiv="Cache-Control"/>
+<meta content="no-cache" http-equiv="Pragma"/>
+<meta content="0" http-equiv="Expires"/>
+<!-- Bootstrap 5 (unique version) -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+<link href="https://vsalema.github.io/tvpt4/css/glass-theme.css?v=1.0.0" rel="stylesheet"/>
+<link href="https://vsalema.github.io/tvpt4/css/nav-responsive.css?v=1" rel="stylesheet"/>
+<!-- Video.js (unique version) + plugin YouTube -->
+<link href="https://vjs.zencdn.net/7.21.1/video-js.css" rel="stylesheet">
+<script src="https://vjs.zencdn.net/7.21.1/video.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/videojs-youtube@3/dist/Youtube.min.js"></script>
+<style>
+  /* Tailles réglables (une valeur → partout) */
+  :root{
+    --ch-logo-size: 60px;  /* logos dans les LISTES */
+    --nb-logo-size: 44px;  /* logo dans la NOWBAR */
+  }
+
+  /* Logos dans les listes de chaînes (panneau, inline) */
+  #channelList img,
+  #channelList2 img,
+  #inlineChannelList img{
+    width: var(--ch-logo-size) !important;
+    height: var(--ch-logo-size) !important;
+    object-fit: contain;
+    flex: 0 0 var(--ch-logo-size);
+    aspect-ratio: 1 / 1;   /* carré, pas obligatoire */
+    margin-right: .5rem;   /* espace avant le titre */
+  }
+
+  /* Logo de la barre “Maintenant” (nowbar) */
+  #nowbar img.logo{
+    width: var(--nb-logo-size) !important;
+    height: var(--nb-logo-size) !important;
+    object-fit: contain;
+  }
+
+.player-wrap { position: relative; }
+
+#ytInlineOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: none;
+  background: #000;
+}
+#ytInlineOverlay.active { display: block; }
+
+#ytInlineFrame, #ytInlineOverlay iframe {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border: 0;
+}
+
+
+
+</style>
+</link></head>
+<body>
+<!-- Top bar -->
+<nav class="navbar navbar-dark glass">
+<div class="container-fluid gap-2">
+<a class="brand navbar-brand d-flex align-items-center gap-2 me-2 nav-left" href="#">
+<img alt="Logo" class="brand-logo" decoding="async" draggable="false" height="26" src="https://vsalema.github.io/tvpt4/css/logogreen.png" width="26"/>
+        STREAMBOX IPTV LIVE
+      </a>
+<!-- FORMULAIRE DANS LA TOPBAR -->
+<form class="d-flex align-items-center gap-2 nav-center" onsubmit="event.preventDefault();
+    const v = document.getElementById('inputUrl').value.trim();
+    if (!v) return;
+    if (/\.json(\?|#|$)/i.test(v)) { window.IPTV_JSON?.load?.(v); }
+    else if (/\.m3u(\?|#|$)/i.test(v)) { window.loadM3UFromUrl?.(v); }
+    else { window.loadSource?.(v); }" role="search">
+<label class="visually-hidden" for="inputUrl">Lire une URL</label>
+<input class="form-control form-control-sm topbar-url" id="inputUrl" inputmode="url" placeholder="URL (.m3u/.m3u8/.mp4/.mp3/.mpd/YouTube)" type="url"/>
+<button class="btn btn-accent btn-sm" id="btnPlay" type="button">Lire</button>
+<label class="btn btn-outline-light btn-sm mb-0" for="inputFile">Fichier…</label>
+<input accept=".m3u,.m3u8,video/*,audio/*" class="form-control d-none" id="inputFile" type="file"/>
+</form>
+<div class="d-flex gap-2 align-items-center nav-right">
+<button aria-label="Rafraîchir la page" class="btn btn-accent btn-sm btn-refresh" id="btnRefresh" title="Rafraîchir la page" type="button">
+<svg aria-hidden="true" class="icon" fill="currentColor" viewbox="0 0 24 24">
+<path d="M17.65 6.35a8 8 0 1 0 2.3 7.11 1 1 0 0 0-1.96-.39 6 6 0 1 1-1.73-5.33l-1.79 1.79a1 1 0 0 0 .7 1.7H22a1 1 0 0 0 1-1V2.99a1 1 0 0 0-1.7-.7l-1.65 1.65a9.96 9.96 0 0 0-2 2.41Z"></path>
+</svg>
+<span class="d-none d-sm-inline"></span>
+</button>
+<!-- 🔸 Boutons rapides -->
+<button class="btn btn-outline-light btn-sm" id="btnQuickFav" title="Ouvrir le panneau sur Favoris" type="button">
+<svg aria-hidden="true" class="icon" fill="currentColor" height="16" viewbox="0 0 24 24" width="16">
+<path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"></path>
+</svg>
+<span class="d-none d-sm-inline ms-1"></span>
+</button>
+<button class="btn btn-outline-light btn-sm" id="btnQuickHist" title="Ouvrir le panneau sur Historique" type="button">
+<svg aria-hidden="true" class="icon" fill="currentColor" height="16" viewbox="0 0 24 24" width="16">
+<path d="M13 3a9 9 0 1 0 9 9h-2a7 7 0 1 1-2.05-4.95L15 7v6h6l-.02-2h-4V5.5A8.98 8.98 0 0 0 13 3z"></path>
+</svg>
+<span class="d-none d-sm-inline ms-1"></span>
+</button>
+<!-- Apparence -->
+<button aria-controls="panel" class="btn btn-outline-light btn-sm" data-bs-target="#panel" data-bs-toggle="offcanvas">
+    Playlist &amp; Chaînes
+  </button><div class="dropdown">
+<button aria-expanded="false" class="btn btn-outline-light btn-sm dropdown-toggle" data-bs-toggle="dropdown" id="btnAppearance">
+<svg aria-hidden="true" class="icon me-1" height="16" viewbox="0 0 24 24" width="16">
+<!-- icône “contraste” simple -->
+<path d="M12 2a10 10 0 1 0 0 20V2z"></path>
+</svg>
+</button>
+<div class="dropdown-menu dropdown-menu-end p-2" style="min-width:220px">
+<div class="form-check mb-1">
+<input class="form-check-input" id="thAuto" name="themeRadios" type="radio" value="auto"/>
+<label class="form-check-label" for="thAuto">Auto (système)</label>
+</div>
+<div class="form-check mb-1">
+<input class="form-check-input" id="thLight" name="themeRadios" type="radio" value="light"/>
+<label class="form-check-label" for="thLight">Clair</label>
+</div>
+<div class="form-check mb-2">
+<input class="form-check-input" id="thDark" name="themeRadios" type="radio" value="dark"/>
+<label class="form-check-label" for="thDark">Sombre</label>
+</div>
+<hr class="my-2"/>
+<div class="form-check">
+<input class="form-check-input" id="hcToggle" type="checkbox"/>
+<label class="form-check-label" for="hcToggle">Contraste élevé</label>
+</div>
+</div>
+</div>
+</div>
+</div>
+</nav>
+<!-- Main content -->
+<main class="container py-3 py-md-4">
+<div class="row g-4">
+<div class="col-12">
+<div class="player-wrap">
+<div id="ytInlineOverlay" aria-hidden="true">
+  <div id="ytInlineFrame"></div>
+</div>
+
+
+<!-- VideoJS player -->
+<video autoplay="" class="video-js vjs-big-play-centered vjs-fill" controls="" id="player" loop="" muted="" playsinline="" poster="https://raw.githubusercontent.com/imagesloads/images/refs/heads/main/img_4b6157ae02c87afb.gif" preload="auto"><!-- <source src="https://vsalema.github.io/tvpt4/css/seedance-1-0-lite.mp4" /> -->
+<!-- Le <source> sera défini par JS -->
+</video>
+<!-- ✨ NOWBAR -->
+<div aria-live="polite" class="nowbar d-none" id="nowbar">
+<img alt="Logo chaîne" class="logo d-none" id="channelLogo"/>
+<div class="meta">
+<h5 class="np-title" id="nowPlaying">Aucune chaîne en cours</h5>
+<div class="np-url text-truncate" id="nowUrl"></div>
+</div>
+</div>
+<!-- /NOWBAR -->
+<!-- 🔎 Mini player dock (aperçu) -->
+<div aria-hidden="true" class="mini-dock d-none" id="miniDock">
+<video class="video-js vjs-fill" id="miniPlayer" muted="" playsinline="" preload="auto"></video>
+</div>
+</div>
+<!-- 🔁 ZAPBAR -->
+<div aria-live="polite" class="zapbar glass" id="zapbar">
+<button aria-pressed="false" class="btn btn-outline-light btn-sm" id="btnFsPage" title="Plein écran — page" type="button">
+<svg aria-hidden="true" class="icon" fill="currentColor" viewbox="0 0 24 24">
+<path d="M7 14H5v5h5v-2H7v-3Zm0-4h2V7h3V5H7v5Zm10 7h-3v2h5v-5h-2v3Zm2-12h-5v2h3v3h2V5Z"></path>
+</svg>
+<span class="d-none d-sm-inline">Page</span>
+</button>
+<button aria-label="Chaîne précédente" class="btn btn-outline-light btn-sm" id="btnPrev" title="Chaîne précédente" type="button">
+<svg aria-hidden="true" class="icon" fill="currentColor" viewbox="0 0 24 24"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"></path></svg>
+<span class="d-none d-sm-inline">Précédent</span>
+</button>
+<div class="zap-title text-truncate" id="zapTitle">—</div>
+<button aria-label="Chaîne suivante" class="btn btn-accent btn-sm" id="btnNext" title="Chaîne suivante" type="button">
+<span class="d-none d-sm-inline">Suivant</span>
+<svg aria-hidden="true" class="icon" fill="currentColor" viewbox="0 0 24 24"><path d="m10 6 1.41 1.41L8.83 10H18v2H8.83l2.58 2.59L10 16l-6-6z"></path></svg>
+</button>
+<button aria-pressed="false" class="btn btn-outline-light btn-sm" id="btnFsPlayer" title="Plein écran — player" type="button">
+<svg aria-hidden="true" class="icon" fill="currentColor" viewbox="0 0 24 24">
+<path d="M7 14H5v5h5v-2H7v-3Zm0-4h2V7h3V5H7v5Zm10 7h-3v2h5v-5h-2v3Zm2-12h-5v2h3v3h2V5Z"></path>
+</svg>
+<span class="d-none d-sm-inline">Player</span>
+</button>
+</div>
+</div>
+<!-- Right column (masquée ici) -->
+</div>
+<!-- ===== Inline Panel à droite du player ===== -->
+<aside aria-hidden="true" class="inline-panel glass aside-tight d-none" id="inlinePanel">
+<div class="p-2 d-flex align-items-center justify-content-between">
+<strong class="small">Playlist &amp; Chaînes</strong>
+<button class="btn btn-outline-light btn-sm" id="inlineClose" title="Fermer" type="button">Fermer</button>
+</div>
+<div class="px-2 pb-2">
+<div class="mb-2">
+<label class="form-label mb-1">Catégorie</label>
+<select class="form-select form-select-sm" id="inlineCategorySelect">
+</select>
+</div>
+<div class="mb-2">
+<input class="form-control form-control-sm" id="inlineSearch" placeholder="Rechercher…">
+</input></div>
+<div class="list-group" id="inlineChannelList" style="max-height:60vh; overflow-y:auto;"></div>
+</div>
+</aside>
+</main>
+<!-- Offcanvas panel (mobile / tablet) -->
+<div aria-labelledby="panelLabel" class="offcanvas offcanvas-start glass aside-tight" id="panel" tabindex="-1">
+<div class="offcanvas-header align-items-center gap-2">
+<!-- Garde le titre pour l’accessibilité, mais caché -->
+<h5 class="offcanvas-title visually-hidden" id="panelLabel">Playlist &amp; Chaînes</h5>
+<div aria-label="Listes rapides" class="btn-group btn-group-sm" role="group">
+<button class="btn btn-outline-light btn-tab" data-listmode="favorites" id="btnListFav" title="Voir mes chaînes favorites" type="button">
+<svg aria-hidden="true" class="icon" fill="currentColor" height="16" viewbox="0 0 24 24" width="16">
+<path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"></path>
+</svg>
+<span class="d-none d-sm-inline ms-1">Favoris</span>
+</button>
+<button class="btn btn-outline-light btn-tab" data-listmode="history" id="btnListHist" title="Voir l’historique de lecture" type="button">
+<svg aria-hidden="true" class="icon" fill="currentColor" height="16" viewbox="0 0 24 24" width="16">
+<path d="M13 3a9 9 0 1 0 9 9h-2a7 7 0 1 1-2.05-4.95L15 7v6h6l-.02-2h-4V5.5A8.98 8.98 0 0 0 13 3z"></path>
+</svg>
+<span class="d-none d-sm-inline ms-1">Historique</span>
+</button>
+<button class="btn btn-outline-light btn-sm" id="btnExportData" title="Exporter favoris &amp; historique" type="button">
+<svg aria-hidden="true" class="icon" fill="currentColor" height="16" viewbox="0 0 24 24" width="16">
+<path d="M5 20h14v-2H5v2Zm7-16-5 5h3v6h4V9h3l-5-5Z"></path>
+</svg>
+<span class="d-none d-sm-inline ms-1">Exporter</span>
+</button>
+<button class="btn btn-outline-light btn-sm" id="btnImportData" title="Importer depuis un fichier JSON" type="button">
+<svg aria-hidden="true" class="icon" fill="currentColor" height="16" viewbox="0 0 24 24" width="16">
+<path d="M5 20h14v-2H5v2Zm7-16 5 5h-3v6h-4V9H7l5-5Z"></path>
+</svg>
+<span class="d-none d-sm-inline ms-1">Importer</span>
+</button>
+<input accept="application/json" class="d-none" id="importFile" type="file">
+</input></div>
+<!-- Bouton Effacer l'historique (caché par défaut) -->
+<button class="btn btn-outline-light btn-sm d-none" id="btnClearHist" title="Effacer tout l’historique" type="button">
+<svg aria-hidden="true" class="icon" fill="currentColor" height="16" viewbox="0 0 24 24" width="16">
+<path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12Zm3.46-9h1.5v8h-1.5v-8Zm4 0h1.5v8h-1.5v-8ZM15.5 4 14 2h-4L8.5 4H4v2h16V4h-4.5Z"></path>
+</svg>
+<span class="d-none d-sm-inline ms-1"></span>
+</button>
+<button aria-label="Fermer" class="btn-close btn-close-white ms-auto" data-bs-dismiss="offcanvas" type="button"></button>
+</div>
+<div class="offcanvas-body">
+<div class="mb-3">
+<!-- ⭐ Label + étoile -->
+<label class="form-label d-flex align-items-center justify-content-between" for="sourceSelect">
+<span>Source M3U</span>
+<button aria-label="Favori" aria-pressed="false" class="btn btn-sm btn-star" id="plFavBtn1" title="Ajouter aux favoris" type="button">
+<svg aria-hidden="true" class="icon" fill="currentColor" height="16" viewbox="0 0 24 24" width="16">
+<path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"></path>
+</svg>
+</button>
+</label>
+<select class="form-select" id="sourceSelect">
+<option value="https://raw.githubusercontent.com/vsalema/tvpt4/refs/heads/main/css/TVradioZap-TV-Europe%2B_s_2024-12-27.m3u">France TV 🇫🇷</option>
+<option value="https://raw.githubusercontent.com/vsalema/tvpt4/refs/heads/main/css/PT.m3u">Portugal TV 🇵🇹</option>
+<option value="https://vsalema.github.io/tvpt4/css/movies.m3u">Films 🎬</option>
+<option value="https://vsalema.github.io/tvpt4/css/movies-2_strict.m3u">Movies 🎬</option>
+<option value="https://vsalema.github.io/tvpt4/css/animation_strict.m3u">Animation 🐭</option>
+<option value="https://vsalema.github.io/tvpt4/css/general_cleaned.m3u">General 🎞</option>
+<option value="https://vsalema.github.io/tvpt4/css/entertainment_strict.m3u">Entertainment 🎞</option>
+<option value="https://vsalema.github.io/tvpt4/css/index_strict.m3u">IPTV Monde 🌎</option>
+<option value="https://vsalema.github.io/tvpt4/css/tony_carreira_best_succes.m3u">Tony Carreira 🎼</option>
+<option value="custom">(Coller un lien personnalisé…)</option>
+</select>
+</div>
+<div class="mb-3 d-none" id="customUrlWrap">
+<label class="form-label" for="customUrl">Lien M3U personnalisé</label>
+<input class="form-control" id="customUrl" placeholder="https://…/playlist.m3u">
+</input></div>
+<div class="d-grid gap-2 mb-3">
+<button class="btn btn-outline-light" id="btnLoadM3U">Charger la playlist</button>
+<input accept=".m3u,.m3u8" class="form-control" id="m3uFile" type="file">
+</input></div>
+<div class="d-grid gap-2 mb-3">
+<button class="btn btn-accent w-50 mx-auto" id="btnCheckLinks">Vérifier les liens</button>
+<div class="progress d-none" id="checkProgress" style="height:10px;">
+<div class="progress-bar" role="progressbar" style="width:0%"></div>
+</div>
+<div class="tiny" id="checkSummary"></div>
+</div>
+<div class="mb-3">
+<label class="form-label" for="categorySelect">Catégorie</label>
+<select class="form-select" id="categorySelect"></select>
+</div>
+<div>
+<label class="form-label d-flex align-items-center justify-content-between">
+<span>Chaînes</span>
+<input class="form-control form-control-sm ms-3" id="search" placeholder="Rechercher…" style="max-width: 180px"/>
+</label>
+<div class="list-group" id="channelList" style="max-height: 50vh; overflow-y:auto;"></div>
+</div>
+</div>
+</div>
+<!-- À coller juste avant 
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      try { loadPlaylistDirectory('playlists.sample.json'); } catch (e) { console.error(e); }
+    });
+  </script>
+
+
+  <script src="exporter_ok_cors_v4.js" defer></script>
+</body> si pas déjà présent par le script -->
+<div aria-hidden="true" class="ctx-menu glass d-none" id="ctxMenu" role="menu">
+<button data-act="play" type="button">Lire</button>
+<button data-act="fav" type="button">Ajouter aux favoris</button>
+<button data-act="copy" type="button">Copier l’URL</button>
+<button data-act="open" type="button">Ouvrir dans un nouvel onglet</button>
+</div>
+<!-- Bootstrap JS -->
+<script defer="" src="./scriptiptv.js"></script>
+<script defer="" src="./json-playlist.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+      try { loadPlaylistDirectory('playlists.sample.json'); } catch (e) { console.error(e); }
+    });
+  </script>
+<script>
+  const selJson = document.getElementById('chanSelectFromJSON'); // l’id de ton <select> de CHAÎNES
+if (selJson) {
+  selJson.addEventListener('change', () => {
+    const opt = selJson.selectedOptions[0];
+    if (!opt) return;
+
+    const url  = (opt.value || '').trim();
+    if (!url || /\.json(\?|#|$)/i.test(url)) return; // ne pas traiter les playlists .json ici
+
+    const logo = opt.dataset.logo || '';
+    const name = opt.textContent || '';
+    window.loadSource?.(url, logo, name);
+  });
+}
+
+</script>
+<!-- YouTube Modal (autonome) -->
+<div class="modal fade" id="ytModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" id="ytModalDialog">
+    <div class="modal-content bg-transparent border-0 shadow-none">
+      <div class="ratio ratio-16x9" id="ytFrameWrap">
+        <iframe id="ytFrame"
+                src=""
+                title="YouTube"
+                allow="autoplay; fullscreen; picture-in-picture"
+                allowfullscreen
+                referrerpolicy="origin-when-cross-origin"
+                style="border:0;"></iframe>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
