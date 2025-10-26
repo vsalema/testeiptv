@@ -292,6 +292,61 @@
   // Si quelqu’un referme l’overlay (au besoin, à toi d’ajouter un bouton), on revient au player standard
   window.__ytOverlayClose = closeYT;
 })();
+// === Unmute YouTube sur clic (via Iframe API, sans recharger la vidéo) ===
+(function(){
+  const overlay = document.getElementById('ytInlineOverlay');
+  const iframe  = document.getElementById('ytInlineFrame');
+  if (!overlay || !iframe) return;
+
+  // Envoie une commande Iframe API YouTube
+  function ytCmd(func, args=[]){
+    try {
+      iframe.contentWindow?.postMessage(JSON.stringify({
+        event: 'command',
+        func,
+        args
+      }), '*');
+    } catch(_) {}
+  }
+
+  // Arme l’unmute pour la prochaine vidéo YouTube ouverte
+  function armUnmuteOnce(){
+    // Un seul clic nécessaire
+    const onClick = () => {
+      // lever le mute + mettre le volume + s’assurer que ça joue
+      ytCmd('unMute');
+      ytCmd('setVolume', [100]);
+      ytCmd('playVideo');
+      overlay.removeEventListener('pointerdown', onClick, true);
+    };
+    overlay.addEventListener('pointerdown', onClick, true);
+  }
+
+  // Réarmer l’unmute à chaque openYT (on hook proprement sans casser ta fonction)
+  const _openYT = window.openYT;
+  if (typeof _openYT === 'function'){
+    window.openYT = function(url, meta){
+      const ok = _openYT(url, meta);
+      if (ok) {
+        // s’assure que l’URL d’embed contient bien enablejsapi & origin (au cas où)
+        try {
+          if (iframe.src && !/enablejsapi=1/.test(iframe.src)) {
+            const u = new URL(iframe.src);
+            u.searchParams.set('enablejsapi','1');
+            u.searchParams.set('origin', location.origin || 'https://localhost');
+            iframe.src = u.toString();
+          }
+        } catch(_) {}
+        // arme l’unmute pour le premier clic utilisateur
+        armUnmuteOnce();
+      }
+      return ok;
+    };
+  }
+})();
+
+
+
 // === Déblocage du son YouTube au premier clic ===
 (function(){
   const iframe = document.getElementById('ytInlineFrame');
