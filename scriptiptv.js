@@ -295,13 +295,17 @@
     await ensureYTAPI();
 
     const playerVars = {
-      autoplay: 1,
-      mute: 1,            // ← démarre muet (autoplay-friendly)
-      playsinline: 1,
-      rel: 0,
-      iv_load_policy: 3,
-      origin: location.origin || undefined
-    };
+  autoplay: 1,
+  mute: 1,          // démarre muet (autoplay OK)
+  playsinline: 1,
+  rel: 0,
+  iv_load_policy: 3
+};
+// origin seulement si on sert en http(s), pas en file://
+if (location.protocol.startsWith('http')) {
+  playerVars.origin = location.origin;
+}
+
 
     if (ytPlayer) {
       try {
@@ -311,22 +315,30 @@
       } catch(_) {}
     } else {
       ytPlayer = new YT.Player(frameHost, {
-        width: '100%',
-        height: '100%',
-        videoId: id,
-        playerVars,
-        events: {
-          onReady: (e)=>{
-            try { e.target.mute(); e.target.playVideo(); } catch(_){}
-          }
-        }
-      });
+  width: '100%',
+  height: '100%',
+  videoId: id,
+  playerVars,
+  events: {
+    onReady: (e)=>{
+      try { e.target.mute(); e.target.playVideo(); } catch(_){}
+    },
+    // NEW: masque le bouton si déjà en lecture avec volume
+    onStateChange: (e)=>{
+      if (e.data === YT.PlayerState.PLAYING) {
+        try {
+          const vol = typeof e.target.getVolume === 'function' ? e.target.getVolume() : 0;
+          if (vol > 0) document.getElementById('ytUnmuteBtn')?.style.setProperty('display','none');
+        } catch(_) {}
+      }
     }
-
-    // Unmute propre au premier geste utilisateur
-    armUnmuteOnce();
-    return true;
   }
+});
+
+// NEW: expose l’instance pour le contrôleur unmute
+window.ytPlayer = ytPlayer;
+window.YT_PLAYER_INLINE = ytPlayer;
+
 
   function closeYT(){
     overlay.classList.remove('active');
@@ -347,6 +359,89 @@
   // Expose (optionnel)
   window.__ytOverlayClose = closeYT;
   window.openYT = openYT; // si tu veux l’appeler ailleurs
+})();
+// === Bouton Unmute explicite pour YouTube (robuste) ===
+(function(){
+  const overlay   = document.getElementById('ytInlineOverlay');
+  const frameHost = document.getElementById('ytInlineFrame');
+  if (!overlay || !frameHost) return;
+
+  // Petit bouton flottant
+  let btn = document.getElementById('ytUnmuteBtn');
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.id = 'ytUnmuteBtn';
+    btn.type = 'button';
+    btn.textContent = '🔊 Son';
+    btn.setAttribute('aria-label','Activer le son');
+    btn.style.cssText = [
+      'position:absolute','right:12px','bottom:12px',
+      'z-index:30','padding:.55rem .8rem','border-radius:999px',
+      'border:1px solid rgba(255,255,255,.55)',
+      'background:rgba(0,0,0,.55)','color:#fff','font-weight:600',
+      'backdrop-filter:saturate(1.1) blur(1.5px)','cursor:pointer',
+      'display:none'
+    ].join(';');
+    overlay.appendChild(btn);
+  }
+
+  // Accès au YT.Player du bloc précédent
+  // (on le lit depuis window pour éviter les closures)
+  function getYT(){ try { return window.ytPlayer || window.YT_PLAYER_INLINE; } catch { return null; } }
+
+  // Affiche/masque le bouton
+  function showBtn(on){ btn.style.display = on ? 'inline-flex' : 'none'; }
+
+  // Expose un hook pour l’openYT
+  const _openYT = window.openYT;
+  if (typeof _openYT === 'function'){
+    window.openYT = async function(url, meta){
+      const ok = await _openYT(url, meta);
+      if (!ok) return ok;
+
+      // Marqueur global (utile si tu veux debugger)
+      window.YT_PLAYER_INLINE = getYT();
+
+      // Affiche le bouton au démarrage (muet)
+      showBtn(true);
+
+      // Tant que YT est muet, on garde le bouton visible
+      const poll = setInterval(()=>{
+        const p = getYT();
+        if (!overlay.classList.contains('active')) { clearInterval(poll); showBtn(false); return; }
+        try {
+          // Certaines implémentations n’exposent pas isMuted → on se base sur le volume
+          const vol = p && typeof p.getVolume === 'function' ? p.getVolume() : 0;
+          const state = p && typeof p.getPlayerState === 'function' ? p.getPlayerState() : -1; // 1 = playing
+          if (vol > 0 && state === 1) { showBtn(false); clearInterval(poll); }
+        } catch {}
+      }, 400);
+
+      return ok;
+    };
+  }
+
+  // Clic explicite ⇒ unmute garanti
+  btn.addEventListener('click', ()=>{
+    try {
+      const p = getYT();
+      if (!p) return;
+      // Séquence “officielle” reconnue comme geste utilisateur
+      if (typeof p.unMute === 'function') p.unMute();
+      if (typeof p.setVolume === 'function') p.setVolume(100);
+      if (typeof p.playVideo === 'function') p.playVideo();
+    } catch {}
+    showBtn(false);
+  });
+
+  // Option clavier: barre espace pour unmute quand overlay actif
+  window.addEventListener('keydown', (e)=>{
+    if (!overlay.classList.contains('active')) return;
+    if (e.code === 'Space' || e.key === ' ') {
+      e.preventDefault();
+      btn.click();
+    }
+  }, {passive:false});
 })();
 
 
